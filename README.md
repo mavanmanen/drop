@@ -23,6 +23,10 @@ Built with **.NET Core 10 Minimal APIs**, **Entity Framework Core (SQLite)**, an
   - Keyboard shortcuts: `Space` (Play/Pause), `F` (Fullscreen), `M` (Mute), `L` (Loop toggle), `← / →` (Seek ±5s), `↑ / ↓` (Volume ±10%).
   - Multi-speed playback (0.5x, 0.75x, 1x, 1.25x, 1.5x, 2x).
   - One-click public link copying with instant toast feedback.
+- **AI Video Analysis with Gemini**:
+  - Optional on-demand AI analysis powered by Google Gemini (`gemini-3.8-flash`).
+  - Generates relevant gaming tags (game title, clutch moments, weapons/characters).
+  - Automatically identifies highlight moments and suggests sub-clips with one-click opening in the cutting tool.
 - **Docker & GitHub Actions Ready**:
   - Single multi-stage container that builds both frontend and backend and includes `ffmpeg`.
   - Docker Compose file for one-command deployment.
@@ -102,6 +106,8 @@ cp .env.example .env
 | `DROP_POSTGRES_USER` | `postgres` | PostgreSQL user |
 | `DROP_POSTGRES_PASSWORD` | `postgres` | PostgreSQL password |
 | `DROP_INGEST_DEFAULT_VISIBILITY` | `public` | Default visibility for ingested clips (`public`, `unlisted`, `private`) |
+| `GEMINI_API_KEY` | *(optional)* | Google Gemini API key for on-demand AI video analysis |
+| `GEMINI_MODEL` | `gemini-3.8-flash` | Optional fallback Gemini model (models can also be selected directly in the UI during analysis) |
 
 ### 5. Running with PostgreSQL
 

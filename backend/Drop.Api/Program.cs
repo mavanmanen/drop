@@ -29,6 +29,7 @@ DatabaseConfigurator.ConfigureDatabase(builder.Services, builder.Configuration, 
 builder.Services.AddHealthChecks();
 builder.Services.AddSingleton<IAuthService, AuthService>();
 builder.Services.AddSingleton<IMediaStorageService, MediaStorageService>();
+builder.Services.AddSingleton<IGeminiAnalysisService, GeminiAnalysisService>();
 builder.Services.AddHostedService<IngestWatcherService>();
 
 // Configure Authentication

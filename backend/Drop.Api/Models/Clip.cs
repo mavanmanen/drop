@@ -14,6 +14,8 @@ public class Clip
     public DateTime CreatedAtUtc { get; set; } = DateTime.UtcNow;
     public long ViewsCount { get; set; } = 0;
     public string Visibility { get; set; } = "public"; // public, unlisted, private
+    public string? Tags { get; set; } // Comma-separated tags or JSON
+    public string? AiAnalysisJson { get; set; } // Stored result of latest AI analysis (JSON)
 
     public string? ParentClipId { get; set; }
     public Clip? ParentClip { get; set; }

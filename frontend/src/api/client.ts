@@ -14,6 +14,19 @@ export interface ClipSummary {
   createdAtUtc: string;
 }
 
+export interface AiSubClipSuggestion {
+  title: string;
+  description: string;
+  startSeconds: number;
+  endSeconds: number;
+}
+
+export interface AiClipAnalysisResult {
+  tags: string[];
+  subClips: AiSubClipSuggestion[];
+  summary: string | null;
+}
+
 export interface Clip {
   id: string;
   title: string;
@@ -28,6 +41,8 @@ export interface Clip {
   createdAtUtc: string;
   viewsCount: number;
   visibility: Visibility;
+  tags?: string[];
+  latestAiAnalysis?: AiClipAnalysisResult | null;
   collections: ClipCollectionSummary[];
   parentClip?: ClipSummary | null;
   childClips?: ClipSummary[];
@@ -147,6 +162,7 @@ class ApiClient {
     search?: string;
     collectionId?: string;
     visibility?: string;
+    tag?: string;
     page?: number;
     pageSize?: number;
   }): Promise<ClipListResponse> {
@@ -154,6 +170,7 @@ class ApiClient {
     if (params?.search) query.set('search', params.search);
     if (params?.collectionId) query.set('collectionId', params.collectionId);
     if (params?.visibility) query.set('visibility', params.visibility);
+    if (params?.tag) query.set('tag', params.tag);
     if (params?.page) query.set('page', params.page.toString());
     if (params?.pageSize) query.set('pageSize', params.pageSize.toString());
 
@@ -165,7 +182,7 @@ class ApiClient {
     return this.request<Clip>(`/clips/${id}`);
   }
 
-  async updateClip(id: string, data: { title: string; description?: string | null; visibility?: string }): Promise<Clip> {
+  async updateClip(id: string, data: { title: string; description?: string | null; visibility?: string; tags?: string[] }): Promise<Clip> {
     return this.request<Clip>(`/clips/${id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
@@ -184,12 +201,25 @@ class ApiClient {
     description?: string;
     visibility?: string;
     collectionId?: string;
+    tags?: string[];
   }): Promise<Clip> {
     return this.request<Clip>(`/clips/${id}/trim`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
     });
+  }
+
+  async analyzeClipAi(id: string, mode: 'tags' | 'subclips' | 'both', model?: string): Promise<AiClipAnalysisResult> {
+    return this.request<AiClipAnalysisResult>(`/clips/${id}/ai-analyze`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ mode, model }),
+    });
+  }
+
+  async getAiStatus(): Promise<{ isConfigured: boolean; availableModels?: string[] }> {
+    return this.request<{ isConfigured: boolean; availableModels?: string[] }>('/clips/ai-status');
   }
 
   async uploadClip(

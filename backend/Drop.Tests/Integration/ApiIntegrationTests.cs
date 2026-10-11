@@ -329,4 +329,83 @@ public class ApiIntegrationTests : IClassFixture<CustomWebApplicationFactory>
         Assert.True(childAfterDeleteJson.TryGetProperty("parentClip", out var parentAfterDelete));
         Assert.Equal(JsonValueKind.Null, parentAfterDelete.ValueKind);
     }
+
+    [Fact]
+    public async Task Clip_TagsUpdateAndFiltering_WorksCorrectly()
+    {
+        var (adminClient, _) = await CreateAdminClientAsync();
+        var clipId = "tagstest" + Guid.NewGuid().ToString("N")[..6];
+
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<DropDbContext>();
+            db.Clips.Add(new Clip
+            {
+                Id = clipId,
+                Title = "Sniper Ace Clip",
+                OriginalFileName = "sniper.mp4",
+                StoredFileName = $"{clipId}.mp4",
+                FileSizeBytes = 100,
+                DurationSeconds = 30.0,
+                Visibility = "public",
+                Tags = "sniper,ace"
+            });
+            await db.SaveChangesAsync();
+        }
+
+        // Verify tags returned in DTO
+        var clipResp = await adminClient.GetFromJsonAsync<JsonElement>($"/api/clips/{clipId}");
+        Assert.True(clipResp.TryGetProperty("tags", out var tagsArr));
+        var tags = tagsArr.EnumerateArray().Select(t => t.GetString()).ToList();
+        Assert.Contains("sniper", tags);
+        Assert.Contains("ace", tags);
+
+        // Update tags
+        var updateResp = await adminClient.PutAsJsonAsync($"/api/clips/{clipId}", new
+        {
+            title = "Sniper Ace Clip Updated",
+            description = "Great play",
+            visibility = "public",
+            tags = new[] { "clutch", "val" }
+        });
+        Assert.Equal(HttpStatusCode.OK, updateResp.StatusCode);
+        var updatedJson = await updateResp.Content.ReadFromJsonAsync<JsonElement>();
+        var updatedTags = updatedJson.GetProperty("tags").EnumerateArray().Select(t => t.GetString()).ToList();
+        Assert.Contains("clutch", updatedTags);
+        Assert.Contains("val", updatedTags);
+        Assert.DoesNotContain("sniper", updatedTags);
+
+        // Filter by tag in list endpoint
+        var filterResp = await adminClient.GetFromJsonAsync<JsonElement>("/api/clips?tag=clutch");
+        var items = filterResp.GetProperty("items").EnumerateArray().ToList();
+        Assert.Contains(items, c => c.GetProperty("id").GetString() == clipId);
+
+        // Check ai-status endpoint (admin required)
+        var aiStatusResp = await adminClient.GetAsync("/api/clips/ai-status");
+        Assert.Equal(HttpStatusCode.OK, aiStatusResp.StatusCode);
+        var aiStatusJson = await aiStatusResp.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.True(aiStatusJson.TryGetProperty("isConfigured", out _));
+        Assert.True(aiStatusJson.TryGetProperty("availableModels", out var modelsArr));
+        Assert.Contains(modelsArr.EnumerateArray(), m => m.GetString() == "gemini-3.8-flash");
+
+        // Anonymous call to ai-status returns Unauthorized
+        var anonClient = CreateAnonymousClient();
+        var anonAiResp = await anonClient.GetAsync("/api/clips/ai-status");
+        Assert.Equal(HttpStatusCode.Unauthorized, anonAiResp.StatusCode);
+
+        // Verify persisting AI analysis onto clip
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<DropDbContext>();
+            var clip = await db.Clips.FindAsync(clipId);
+            clip!.AiAnalysisJson = "{\"tags\":[\"clutch\",\"sniper\"],\"subClips\":[{\"title\":\"Headshot\",\"description\":\"Crisp shot\",\"startSeconds\":10.5,\"endSeconds\":18.0}],\"summary\":\"Great clutch moment\"}";
+            await db.SaveChangesAsync();
+        }
+
+        var clipWithAiResp = await adminClient.GetFromJsonAsync<JsonElement>($"/api/clips/{clipId}");
+        Assert.True(clipWithAiResp.TryGetProperty("latestAiAnalysis", out var latestAi));
+        Assert.Equal(JsonValueKind.Object, latestAi.ValueKind);
+        Assert.Equal("Great clutch moment", latestAi.GetProperty("summary").GetString());
+        Assert.Equal("Headshot", latestAi.GetProperty("subClips")[0].GetProperty("title").GetString());
+    }
 }

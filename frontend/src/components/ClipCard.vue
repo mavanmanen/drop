@@ -118,6 +118,21 @@ async function copyShareLink(e: Event) {
           <span>{{ col.name }}</span>
         </router-link>
       </div>
+
+      <!-- Tags row -->
+      <div v-if="clip.tags && clip.tags.length > 0" class="tags-badge-row">
+        <router-link
+          v-for="t in clip.tags.slice(0, 3)"
+          :key="t"
+          :to="`/?tag=${encodeURIComponent(t)}`"
+          class="card-tag-pill"
+        >
+          <span>#{{ t }}</span>
+        </router-link>
+        <span v-if="clip.tags.length > 3" class="more-tags-indicator">
+          +{{ clip.tags.length - 3 }}
+        </span>
+      </div>
     </div>
   </div>
 </template>
@@ -339,6 +354,37 @@ async function copyShareLink(e: Event) {
         background: rgba(139, 92, 246, 0.25);
         color: #fff;
       }
+    }
+  }
+
+  .tags-badge-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.3rem;
+    margin-top: 0.15rem;
+
+    .card-tag-pill {
+      font-size: 0.68rem;
+      font-weight: 600;
+      color: $accent-cyan;
+      background: rgba(0, 242, 254, 0.08);
+      border: 1px solid rgba(0, 242, 254, 0.2);
+      padding: 0.12rem 0.4rem;
+      border-radius: 4px;
+      text-decoration: none;
+      transition: all $transition-fast;
+
+      &:hover {
+        background: rgba(0, 242, 254, 0.18);
+        border-color: $accent-cyan;
+      }
+    }
+
+    .more-tags-indicator {
+      font-size: 0.65rem;
+      color: $text-muted;
+      font-weight: 600;
     }
   }
 }

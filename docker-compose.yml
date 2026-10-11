@@ -26,6 +26,9 @@ services:
       - DROP_DB_PATH=${DROP_DB_PATH:-/data/db/drop.db}
       # Default visibility for automatically ingested clips (public, unlisted, or private)
       - DROP_INGEST_DEFAULT_VISIBILITY=${DROP_INGEST_DEFAULT_VISIBILITY:-public}
+      # Gemini AI Video Analysis (optional)
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - GEMINI_MODEL=${GEMINI_MODEL:-gemini-3.8-flash}
     develop:
       watch:
         # Rebuild container when backend source code or project file changes

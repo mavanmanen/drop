@@ -17,7 +17,7 @@ const pageSize = 24;
 const isLoading = ref(true);
 const selectedCollectionId = ref<string>('');
 const selectedVisibility = ref<string>('');
-
+const currentTag = ref((route.query.tag as string) || '');
 const currentSearch = ref((route.query.q as string) || '');
 
 async function loadClips() {
@@ -27,6 +27,7 @@ async function loadClips() {
       search: currentSearch.value || undefined,
       collectionId: selectedCollectionId.value || undefined,
       visibility: selectedVisibility.value || undefined,
+      tag: currentTag.value || undefined,
       page: currentPage.value,
       pageSize,
     });
@@ -68,6 +69,15 @@ watch(
   () => route.query.q,
   (newQ) => {
     currentSearch.value = (newQ as string) || '';
+    currentPage.value = 1;
+    loadClips();
+  }
+);
+
+watch(
+  () => route.query.tag,
+  (newTag) => {
+    currentTag.value = (newTag as string) || '';
     currentPage.value = 1;
     loadClips();
   }
@@ -168,6 +178,12 @@ watch(
     <div v-if="currentSearch" class="search-notice">
       <span>Showing results for "<strong>{{ currentSearch }}</strong>"</span>
       <router-link to="/" class="clear-search-btn">Clear search</router-link>
+    </div>
+
+    <!-- Tag Active Notice -->
+    <div v-if="currentTag" class="search-notice">
+      <span>Filtered by tag: <strong>#{{ currentTag }}</strong></span>
+      <router-link to="/" class="clear-search-btn">Clear filter</router-link>
     </div>
 
     <!-- Clips Grid -->

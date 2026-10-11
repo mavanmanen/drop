@@ -23,6 +23,8 @@ public class DropDbContext(DbContextOptions<DropDbContext> options) : DbContext(
             entity.Property(c => c.ContentType).HasMaxLength(100);
             entity.Property(c => c.ThumbnailFileName).HasMaxLength(500);
             entity.Property(c => c.Visibility).HasMaxLength(20).HasDefaultValue("public");
+            entity.Property(c => c.Tags).HasMaxLength(2000);
+            entity.Property(c => c.AiAnalysisJson).HasMaxLength(32000);
             entity.Property(c => c.ParentClipId).HasMaxLength(50);
 
             entity.HasOne(c => c.ParentClip)

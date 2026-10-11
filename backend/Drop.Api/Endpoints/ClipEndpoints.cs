@@ -22,6 +22,8 @@ public static class ClipEndpoints
         DateTime CreatedAtUtc,
         long ViewsCount,
         string Visibility,
+        List<string> Tags,
+        AiClipAnalysisResult? LatestAiAnalysis,
         List<ClipCollectionSummaryDto> Collections,
         ClipSummaryDto? ParentClip,
         List<ClipSummaryDto> ChildClips
@@ -37,15 +39,17 @@ public static class ClipEndpoints
     );
 
     public record ClipCollectionSummaryDto(string Id, string Name);
-    public record ClipUpdateRequest(string Title, string? Description, string? Visibility);
+    public record ClipUpdateRequest(string Title, string? Description, string? Visibility, List<string>? Tags);
     public record ClipTrimRequest(
         double StartSeconds,
         double EndSeconds,
         string? Title,
         string? Description,
         string? Visibility,
-        string? CollectionId
+        string? CollectionId,
+        List<string>? Tags
     );
+    public record ClipAnalyzeAiRequest(string Mode, string? Model = null); // "tags", "subclips", "both"
     public record ClipListResponse(List<ClipDto> Items, int TotalCount, int Page, int PageSize);
 
     public static string NormalizeVisibility(string? v)
@@ -57,6 +61,40 @@ public static class ClipEndpoints
             "private" => "private",
             _ => "public"
         };
+    }
+
+    public static List<string> ParseTags(string? tags)
+    {
+        if (string.IsNullOrWhiteSpace(tags)) return [];
+        return tags.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
+
+    public static string FormatTags(IEnumerable<string>? tags)
+    {
+        if (tags == null) return string.Empty;
+        var clean = tags.Where(t => !string.IsNullOrWhiteSpace(t))
+            .Select(t => t.Trim().TrimStart('#'))
+            .Distinct(StringComparer.OrdinalIgnoreCase);
+        return string.Join(",", clean);
+    }
+
+    public static AiClipAnalysisResult? ParseAiAnalysis(string? json)
+    {
+        if (string.IsNullOrWhiteSpace(json)) return null;
+        try
+        {
+            var options = new System.Text.Json.JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true
+            };
+            return System.Text.Json.JsonSerializer.Deserialize<AiClipAnalysisResult>(json, options);
+        }
+        catch
+        {
+            return null;
+        }
     }
 
     public static void MapClipEndpoints(this IEndpointRouteBuilder app)
@@ -71,6 +109,7 @@ public static class ClipEndpoints
             [FromQuery] string? search,
             [FromQuery] string? collectionId,
             [FromQuery] string? visibility,
+            [FromQuery] string? tag,
             [FromQuery] int page = 1,
             [FromQuery] int pageSize = 24) =>
         {
@@ -99,10 +138,19 @@ public static class ClipEndpoints
                 query = query.Where(c => c.CollectionClips.Any(cc => cc.CollectionId == collectionId));
             }
 
+            if (!string.IsNullOrWhiteSpace(tag))
+            {
+                var t = tag.Trim().ToLower();
+                query = query.Where(c => c.Tags != null && c.Tags.ToLower().Contains(t));
+            }
+
             if (!string.IsNullOrWhiteSpace(search))
             {
                 var term = search.Trim().ToLower();
-                query = query.Where(c => c.Title.ToLower().Contains(term) || (c.Description != null && c.Description.ToLower().Contains(term)));
+                query = query.Where(c =>
+                    c.Title.ToLower().Contains(term) ||
+                    (c.Description != null && c.Description.ToLower().Contains(term)) ||
+                    (c.Tags != null && c.Tags.ToLower().Contains(term)));
             }
 
             var totalCount = await query.CountAsync();
@@ -282,7 +330,7 @@ public static class ClipEndpoints
         .DisableAntiforgery()
         .RequireAuthorization();
 
-        // Admin: Update clip title, description, visibility
+        // Admin: Update clip title, description, visibility, tags
         group.MapPut("/{id}", async (string id, ClipUpdateRequest req, DropDbContext db) =>
         {
             var clip = await db.Clips.FindAsync(id);
@@ -297,12 +345,18 @@ public static class ClipEndpoints
             {
                 clip.Visibility = NormalizeVisibility(req.Visibility);
             }
+            if (req.Tags != null)
+            {
+                clip.Tags = FormatTags(req.Tags);
+            }
 
             await db.SaveChangesAsync();
 
             var updated = await db.Clips
                 .Include(c => c.CollectionClips)
                 .ThenInclude(cc => cc.Collection)
+                .Include(c => c.ParentClip)
+                .Include(c => c.ChildClips)
                 .FirstAsync(c => c.Id == id);
 
             return Results.Ok(ToDto(updated));
@@ -346,6 +400,8 @@ public static class ClipEndpoints
                 ? NormalizeVisibility(req.Visibility)
                 : sourceClip.Visibility;
 
+            var initialTags = req.Tags != null ? FormatTags(req.Tags) : sourceClip.Tags;
+
             try
             {
                 var (storedFileName, thumbnailFileName, durationSeconds, fileSize) =
@@ -365,6 +421,7 @@ public static class ClipEndpoints
                     CreatedAtUtc = DateTime.UtcNow,
                     ViewsCount = 0,
                     Visibility = visibility,
+                    Tags = initialTags,
                     ParentClipId = sourceClip.Id
                 };
 
@@ -408,6 +465,66 @@ public static class ClipEndpoints
         })
         .RequireAuthorization();
 
+        // Admin: AI Video Analysis via Gemini
+        group.MapPost("/{id}/ai-analyze", async (
+            string id,
+            ClipAnalyzeAiRequest req,
+            DropDbContext db,
+            IMediaStorageService mediaStorage,
+            IGeminiAnalysisService geminiService,
+            CancellationToken cancellationToken) =>
+        {
+            if (!geminiService.IsConfigured)
+            {
+                return Results.BadRequest(new
+                {
+                    error = "Gemini AI is not configured. Please set GEMINI_API_KEY in the environment or .env file to enable AI analysis."
+                });
+            }
+
+            var clip = await db.Clips.FindAsync([id], cancellationToken: cancellationToken);
+            if (clip == null) return Results.NotFound(new { error = "Clip not found" });
+
+            var filePath = Path.GetFullPath(mediaStorage.GetClipFilePath(clip.StoredFileName));
+            if (!File.Exists(filePath))
+            {
+                return Results.NotFound(new { error = "Video file missing on disk" });
+            }
+
+            try
+            {
+                var result = await geminiService.AnalyzeClipAsync(
+                    videoFilePath: filePath,
+                    mimeType: clip.ContentType,
+                    durationSeconds: clip.DurationSeconds,
+                    promptMode: req.Mode,
+                    model: req.Model,
+                    cancellationToken: cancellationToken);
+
+                // Persist the latest AI analysis result to the clip entity
+                clip.AiAnalysisJson = System.Text.Json.JsonSerializer.Serialize(result);
+                await db.SaveChangesAsync(cancellationToken);
+
+                return Results.Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return Results.BadRequest(new { error = $"AI analysis failed: {ex.Message}" });
+            }
+        })
+        .RequireAuthorization();
+
+        // Admin: Check Gemini AI configuration status and available models
+        group.MapGet("/ai-status", (IGeminiAnalysisService geminiService) =>
+        {
+            return Results.Ok(new
+            {
+                isConfigured = geminiService.IsConfigured,
+                availableModels = geminiService.AvailableModels
+            });
+        })
+        .RequireAuthorization();
+
         // Admin: Delete clip
         group.MapDelete("/{id}", async (string id, DropDbContext db, IMediaStorageService mediaStorage) =>
         {
@@ -438,6 +555,8 @@ public static class ClipEndpoints
         CreatedAtUtc: clip.CreatedAtUtc,
         ViewsCount: clip.ViewsCount,
         Visibility: clip.Visibility ?? "public",
+        Tags: ParseTags(clip.Tags),
+        LatestAiAnalysis: ParseAiAnalysis(clip.AiAnalysisJson),
         Collections: clip.CollectionClips
             .Where(cc => cc.Collection != null)
             .OrderBy(cc => cc.OrderIndex)
