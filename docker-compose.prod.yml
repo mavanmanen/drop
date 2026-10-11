@@ -27,7 +27,17 @@ services:
       - DROP_DATA_DIR=/data
       - DROP_INGEST_PATH=/data/ingest
       - DROP_STORAGE_PATH=/data/clips
+
+      # Database provider: 'sqlite' (default) or 'postgres'
+      - DROP_DB_PROVIDER=sqlite
       - DROP_DB_PATH=/data/db/drop.db
+      # If using PostgreSQL:
+      # - DROP_DB_PROVIDER=postgres
+      # - DROP_POSTGRES_HOST=postgres
+      # - DROP_POSTGRES_PORT=5432
+      # - DROP_POSTGRES_DB=drop
+      # - DROP_POSTGRES_USER=drop
+      # - DROP_POSTGRES_PASSWORD=your-postgres-password
 
       # Default visibility for automatically ingested clips: 'public', 'unlisted', or 'private'
       - DROP_INGEST_DEFAULT_VISIBILITY=public
