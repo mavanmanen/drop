@@ -71,6 +71,7 @@ public class ApiIntegrationTests : IClassFixture<CustomWebApplicationFactory>
         Assert.Equal("drop", json.GetProperty("name").GetString());
         Assert.Equal("admin", json.GetProperty("adminUsername").GetString());
         Assert.Equal("public", json.GetProperty("defaultIngestVisibility").GetString());
+        Assert.Equal("sqlite", json.GetProperty("databaseProvider").GetString());
     }
 
     [Fact]

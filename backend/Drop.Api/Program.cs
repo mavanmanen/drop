@@ -22,37 +22,8 @@ builder.Services.Configure<FormOptions>(options =>
     options.MultipartHeadersLengthLimit = int.MaxValue;
 });
 
-// Configure Database
-var configuredDataDir = builder.Configuration["DROP_DATA_DIR"];
-string baseDataDir = !string.IsNullOrWhiteSpace(configuredDataDir)
-    ? (Path.IsPathRooted(configuredDataDir) ? configuredDataDir : Path.GetFullPath(Path.Combine(builder.Environment.ContentRootPath, configuredDataDir)))
-    : Path.Combine(AppContext.BaseDirectory, "data");
-
-baseDataDir = Path.GetFullPath(baseDataDir);
-Directory.CreateDirectory(baseDataDir);
-
-var dbPath = builder.Configuration["DROP_DB_PATH"]
-             ?? Path.Combine(baseDataDir, "db", "drop.db");
-dbPath = Path.GetFullPath(dbPath);
-
-var dbDirectory = Path.GetDirectoryName(dbPath);
-if (!string.IsNullOrEmpty(dbDirectory) && !Directory.Exists(dbDirectory))
-{
-    Directory.CreateDirectory(dbDirectory);
-}
-
-// Seamless migration: If db was previously located directly in baseDataDir/drop.db, move it to db/
-var legacyDbPath = Path.Combine(baseDataDir, "drop.db");
-if (File.Exists(legacyDbPath) && !File.Exists(dbPath))
-{
-    File.Move(legacyDbPath, dbPath);
-    if (File.Exists(legacyDbPath + "-shm")) File.Move(legacyDbPath + "-shm", dbPath + "-shm", true);
-    if (File.Exists(legacyDbPath + "-wal")) File.Move(legacyDbPath + "-wal", dbPath + "-wal", true);
-}
-
-var connectionString = $"Data Source={dbPath}";
-builder.Services.AddDbContext<DropDbContext>(options =>
-    options.UseSqlite(connectionString));
+// Configure Database (SQLite or PostgreSQL)
+DatabaseConfigurator.ConfigureDatabase(builder.Services, builder.Configuration, builder.Environment);
 
 // Register Application Services
 builder.Services.AddHealthChecks();
@@ -117,19 +88,7 @@ var app = builder.Build();
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<DropDbContext>();
-    await db.Database.EnsureCreatedAsync();
-
-    try
-    {
-        await db.Database.ExecuteSqlRawAsync("ALTER TABLE Clips ADD COLUMN Visibility TEXT NOT NULL DEFAULT 'public';");
-    }
-    catch { /* Column already exists */ }
-
-    try
-    {
-        await db.Database.ExecuteSqlRawAsync("ALTER TABLE Collections ADD COLUMN Visibility TEXT NOT NULL DEFAULT 'public';");
-    }
-    catch { /* Column already exists */ }
+    await DatabaseConfigurator.InitializeDatabaseAsync(db);
 }
 
 app.UseCors();
@@ -169,6 +128,7 @@ app.MapGet("/api/system/status", async (
         adminUsername = authService.AdminUsername,
         ingestDirectory = mediaStorage.IngestDirectory,
         defaultIngestVisibility,
+        databaseProvider = DatabaseConfigurator.GetDatabaseProvider(config),
         clipsCount = clipCount,
         collectionsCount = collectionCount,
         serverTimeUtc = DateTime.UtcNow

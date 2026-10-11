@@ -73,8 +73,25 @@ Edit `docker-compose.yml` or create an `.env` file to customize:
 | `DROP_JWT_SECRET` | *(auto-generated)* | 32+ character key for JWT token signing |
 | `DROP_INGEST_PATH` | `/data/ingest` | Path to folder monitored for new clips |
 | `DROP_STORAGE_PATH` | `/data/clips` | Path where permanent video files are kept |
-| `DROP_DB_PATH` | `/data/db/drop.db` | SQLite database file location |
+| `DROP_DB_PROVIDER` | `sqlite` | Database engine: `sqlite` or `postgres` |
+| `DROP_DB_PATH` | `/data/db/drop.db` | SQLite database file location (when using SQLite) |
+| `DROP_DB_CONNECTION_STRING` | *(optional)* | Full connection string or URL for PostgreSQL (`postgres://...` or `Host=...`) |
+| `DROP_POSTGRES_HOST` | `localhost` | PostgreSQL host (when using Postgres) |
+| `DROP_POSTGRES_PORT` | `5432` | PostgreSQL port (when using Postgres) |
+| `DROP_POSTGRES_DB` | `drop` | PostgreSQL database name |
+| `DROP_POSTGRES_USER` | `postgres` | PostgreSQL user |
+| `DROP_POSTGRES_PASSWORD` | `postgres` | PostgreSQL password |
 | `DROP_INGEST_DEFAULT_VISIBILITY` | `public` | Default visibility for ingested clips (`public`, `unlisted`, `private`) |
+
+### 4. Running with PostgreSQL
+
+To use PostgreSQL instead of SQLite, you can deploy with the included PostgreSQL compose file:
+
+```bash
+docker compose -f docker-compose.postgres.yml up -d
+```
+
+Or configure `DROP_DB_PROVIDER=postgres` along with your PostgreSQL connection string/credentials in your environment.
 
 ---
 
