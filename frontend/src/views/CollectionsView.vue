@@ -4,7 +4,7 @@ import { api, type Collection } from '../api/client';
 import { useAuth } from '../stores/auth';
 import { useToast } from '../stores/toast';
 import CollectionModal from '../components/CollectionModal.vue';
-import { Folder, FolderPlus, Film, Edit3, Trash2, ArrowRight } from '@lucide/vue';
+import { Folder, FolderPlus, Film, Edit3, Trash2, ArrowRight, Lock, Link2 } from '@lucide/vue';
 
 const { state: auth } = useAuth();
 const { success, error: toastError } = useToast();
@@ -108,6 +108,13 @@ onMounted(() => {
           <div class="clip-count-pill">
             <Film :size="12" />
             <span>{{ col.clipCount }} {{ col.clipCount === 1 ? 'clip' : 'clips' }}</span>
+          </div>
+
+          <!-- Visibility badge -->
+          <div v-if="col.visibility !== 'public'" class="visibility-pill" :class="`vis-${col.visibility}`">
+            <Lock v-if="col.visibility === 'private'" :size="10" />
+            <Link2 v-else :size="10" />
+            <span>{{ col.visibility }}</span>
           </div>
 
           <!-- Admin actions -->
@@ -267,6 +274,33 @@ onMounted(() => {
     display: flex;
     align-items: center;
     gap: 0.35rem;
+  }
+
+  .visibility-pill {
+    position: absolute;
+    top: 0.6rem;
+    left: 0.6rem;
+    padding: 0.2rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.68rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+    backdrop-filter: blur(4px);
+    z-index: 5;
+
+    &.vis-unlisted {
+      background: rgba(245, 158, 11, 0.9);
+      color: #0f172a;
+    }
+
+    &.vis-private {
+      background: rgba(244, 63, 94, 0.9);
+      color: #ffffff;
+    }
   }
 
   .card-admin-actions {

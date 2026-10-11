@@ -35,11 +35,15 @@ public class MediaStorageService : IMediaStorageService
     public string ClipsDirectory => _clipsDirectory;
     public string ThumbnailsDirectory => _thumbnailsDirectory;
 
-    public MediaStorageService(IConfiguration configuration, ILogger<MediaStorageService> logger)
+    public MediaStorageService(IConfiguration configuration, IWebHostEnvironment env, ILogger<MediaStorageService> logger)
     {
         _logger = logger;
 
-        var baseDataDir = configuration["DROP_DATA_DIR"] ?? Path.Combine(AppContext.BaseDirectory, "data");
+        var configured = configuration["DROP_DATA_DIR"];
+        string baseDataDir = !string.IsNullOrWhiteSpace(configured)
+            ? (Path.IsPathRooted(configured) ? configured : Path.GetFullPath(Path.Combine(env.ContentRootPath, configured)))
+            : Path.Combine(AppContext.BaseDirectory, "data");
+
         baseDataDir = Path.GetFullPath(baseDataDir);
         _ingestDirectory = Path.GetFullPath(configuration["DROP_INGEST_PATH"] ?? Path.Combine(baseDataDir, "ingest"));
         _clipsDirectory = Path.GetFullPath(configuration["DROP_STORAGE_PATH"] ?? Path.Combine(baseDataDir, "clips"));

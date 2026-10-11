@@ -21,31 +21,59 @@ public static class ClipEndpoints
         string? ThumbnailUrl,
         DateTime CreatedAtUtc,
         long ViewsCount,
+        string Visibility,
         List<ClipCollectionSummaryDto> Collections
     );
 
     public record ClipCollectionSummaryDto(string Id, string Name);
-    public record ClipUpdateRequest(string Title, string? Description);
+    public record ClipUpdateRequest(string Title, string? Description, string? Visibility);
     public record ClipListResponse(List<ClipDto> Items, int TotalCount, int Page, int PageSize);
+
+    public static string NormalizeVisibility(string? v)
+    {
+        var val = v?.Trim().ToLowerInvariant();
+        return val switch
+        {
+            "unlisted" => "unlisted",
+            "private" => "private",
+            _ => "public"
+        };
+    }
 
     public static void MapClipEndpoints(this IEndpointRouteBuilder app)
     {
         var group = app.MapGroup("/api/clips").WithTags("Clips");
 
-        // Public: List clips with pagination and search
+        // List clips: Public users see only "public"; Admin sees public, unlisted, and private
         group.MapGet("/", async (
             DropDbContext db,
+            IAuthService authService,
+            HttpContext httpContext,
             [FromQuery] string? search,
             [FromQuery] string? collectionId,
+            [FromQuery] string? visibility,
             [FromQuery] int page = 1,
             [FromQuery] int pageSize = 24) =>
         {
             if (page < 1) page = 1;
             if (pageSize < 1 || pageSize > 100) pageSize = 24;
 
+            var isAdmin = authService.IsAdmin(httpContext);
+
             IQueryable<Clip> query = db.Clips
                 .Include(c => c.CollectionClips)
                 .ThenInclude(cc => cc.Collection);
+
+            // Visibility filtering
+            if (!isAdmin)
+            {
+                query = query.Where(c => c.Visibility == "public");
+            }
+            else if (!string.IsNullOrWhiteSpace(visibility))
+            {
+                var norm = NormalizeVisibility(visibility);
+                query = query.Where(c => c.Visibility == norm);
+            }
 
             if (!string.IsNullOrWhiteSpace(collectionId))
             {
@@ -70,8 +98,8 @@ public static class ClipEndpoints
             return Results.Ok(new ClipListResponse(items, totalCount, page, pageSize));
         });
 
-        // Public: Get single clip details
-        group.MapGet("/{id}", async (string id, DropDbContext db) =>
+        // Get single clip: Public and unlisted can be viewed by anyone with direct link; Private requires admin
+        group.MapGet("/{id}", async (string id, DropDbContext db, IAuthService authService, HttpContext httpContext) =>
         {
             var clip = await db.Clips
                 .Include(c => c.CollectionClips)
@@ -80,6 +108,12 @@ public static class ClipEndpoints
 
             if (clip == null) return Results.NotFound(new { error = "Clip not found" });
 
+            var isAdmin = authService.IsAdmin(httpContext);
+            if (clip.Visibility == "private" && !isAdmin)
+            {
+                return Results.NotFound(new { error = "Clip not found" });
+            }
+
             // Increment views
             clip.ViewsCount++;
             await db.SaveChangesAsync();
@@ -87,11 +121,21 @@ public static class ClipEndpoints
             return Results.Ok(ToDto(clip));
         });
 
-        // Public: Stream video with HTTP 206 Partial Content range support
-        group.MapMethods("/{id}/stream", ["GET", "HEAD"], (string id, DropDbContext db, IMediaStorageService mediaStorage) =>
+        // Stream video: Private clips require admin
+        group.MapMethods("/{id}/stream", ["GET", "HEAD"], (
+            string id,
+            DropDbContext db,
+            IMediaStorageService mediaStorage,
+            IAuthService authService,
+            HttpContext httpContext) =>
         {
             var clip = db.Clips.AsNoTracking().FirstOrDefault(c => c.Id == id);
             if (clip == null) return Results.NotFound(new { error = "Clip not found" });
+
+            if (clip.Visibility == "private" && !authService.IsAdmin(httpContext))
+            {
+                return Results.NotFound(new { error = "Clip not found" });
+            }
 
             var filePath = Path.GetFullPath(mediaStorage.GetClipFilePath(clip.StoredFileName));
             if (!File.Exists(filePath))
@@ -107,11 +151,21 @@ public static class ClipEndpoints
                 enableRangeProcessing: true);
         });
 
-        // Public: Thumbnail
-        group.MapMethods("/{id}/thumbnail", ["GET", "HEAD"], (string id, DropDbContext db, IMediaStorageService mediaStorage) =>
+        // Thumbnail: Private clips require admin
+        group.MapMethods("/{id}/thumbnail", ["GET", "HEAD"], (
+            string id,
+            DropDbContext db,
+            IMediaStorageService mediaStorage,
+            IAuthService authService,
+            HttpContext httpContext) =>
         {
             var clip = db.Clips.AsNoTracking().FirstOrDefault(c => c.Id == id);
             if (clip == null) return Results.NotFound();
+
+            if (clip.Visibility == "private" && !authService.IsAdmin(httpContext))
+            {
+                return Results.NotFound();
+            }
 
             var thumbPath = mediaStorage.GetThumbnailFilePath(clip.ThumbnailFileName);
             if (thumbPath != null && File.Exists(thumbPath))
@@ -138,6 +192,7 @@ public static class ClipEndpoints
             [FromForm] string? title,
             [FromForm] string? description,
             [FromForm] string? collectionId,
+            [FromForm] string? visibility,
             DropDbContext db,
             IMediaStorageService mediaStorage) =>
         {
@@ -166,7 +221,8 @@ public static class ClipEndpoints
                 DurationSeconds = durationSeconds,
                 ThumbnailFileName = thumbnailFileName,
                 CreatedAtUtc = DateTime.UtcNow,
-                ViewsCount = 0
+                ViewsCount = 0,
+                Visibility = NormalizeVisibility(visibility)
             };
 
             db.Clips.Add(clip);
@@ -204,7 +260,7 @@ public static class ClipEndpoints
         .DisableAntiforgery()
         .RequireAuthorization();
 
-        // Admin: Update clip title / description
+        // Admin: Update clip title, description, visibility
         group.MapPut("/{id}", async (string id, ClipUpdateRequest req, DropDbContext db) =>
         {
             var clip = await db.Clips.FindAsync(id);
@@ -215,6 +271,10 @@ public static class ClipEndpoints
                 clip.Title = req.Title.Trim();
             }
             clip.Description = req.Description?.Trim();
+            if (!string.IsNullOrWhiteSpace(req.Visibility))
+            {
+                clip.Visibility = NormalizeVisibility(req.Visibility);
+            }
 
             await db.SaveChangesAsync();
 
@@ -256,6 +316,7 @@ public static class ClipEndpoints
         ThumbnailUrl: $"/api/clips/{clip.Id}/thumbnail",
         CreatedAtUtc: clip.CreatedAtUtc,
         ViewsCount: clip.ViewsCount,
+        Visibility: clip.Visibility ?? "public",
         Collections: clip.CollectionClips
             .Where(cc => cc.Collection != null)
             .OrderBy(cc => cc.OrderIndex)

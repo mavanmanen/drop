@@ -12,6 +12,7 @@ public interface IAuthService
     bool ValidateCredentials(string username, string password);
     string GenerateToken(string username);
     ClaimsPrincipal? ValidateToken(string token);
+    bool IsAdmin(HttpContext context);
 }
 
 public class AuthService : IAuthService
@@ -106,5 +107,26 @@ public class AuthService : IAuthService
         {
             return null;
         }
+    }
+
+    public bool IsAdmin(HttpContext context)
+    {
+        if (context.User.Identity?.IsAuthenticated == true)
+            return true;
+
+        if (context.Request.Cookies.TryGetValue("drop_auth", out var token))
+        {
+            var principal = ValidateToken(token);
+            return principal?.Identity?.IsAuthenticated == true;
+        }
+
+        var authHeader = context.Request.Headers.Authorization.ToString();
+        if (authHeader.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
+        {
+            var principal = ValidateToken(authHeader[7..].Trim());
+            return principal?.Identity?.IsAuthenticated == true;
+        }
+
+        return false;
     }
 }

@@ -23,7 +23,12 @@ builder.Services.Configure<FormOptions>(options =>
 });
 
 // Configure Database
-var baseDataDir = Path.GetFullPath(builder.Configuration["DROP_DATA_DIR"] ?? Path.Combine(AppContext.BaseDirectory, "data"));
+var configuredDataDir = builder.Configuration["DROP_DATA_DIR"];
+string baseDataDir = !string.IsNullOrWhiteSpace(configuredDataDir)
+    ? (Path.IsPathRooted(configuredDataDir) ? configuredDataDir : Path.GetFullPath(Path.Combine(builder.Environment.ContentRootPath, configuredDataDir)))
+    : Path.Combine(AppContext.BaseDirectory, "data");
+
+baseDataDir = Path.GetFullPath(baseDataDir);
 Directory.CreateDirectory(baseDataDir);
 
 var dbPath = builder.Configuration["DROP_DB_PATH"]
@@ -112,6 +117,18 @@ using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<DropDbContext>();
     await db.Database.EnsureCreatedAsync();
+
+    try
+    {
+        await db.Database.ExecuteSqlRawAsync("ALTER TABLE Clips ADD COLUMN Visibility TEXT NOT NULL DEFAULT 'public';");
+    }
+    catch { /* Column already exists */ }
+
+    try
+    {
+        await db.Database.ExecuteSqlRawAsync("ALTER TABLE Collections ADD COLUMN Visibility TEXT NOT NULL DEFAULT 'public';");
+    }
+    catch { /* Column already exists */ }
 }
 
 app.UseCors();
@@ -147,7 +164,7 @@ app.MapGet("/api/system/status", async (
 }).WithTags("System");
 
 // OpenGraph HTML for share bots (Discord, Twitter/X, Facebook, Telegram)
-app.MapGet("/c/{id}", async (string id, HttpContext context, DropDbContext db) =>
+app.MapGet("/c/{id}", async (string id, HttpContext context, DropDbContext db, IAuthService authService) =>
 {
     var userAgent = context.Request.Headers.UserAgent.ToString().ToLowerInvariant();
     var isBot = userAgent.Contains("discordbot") ||
@@ -157,7 +174,15 @@ app.MapGet("/c/{id}", async (string id, HttpContext context, DropDbContext db) =
                 userAgent.Contains("telegrambot");
 
     var clip = await db.Clips.FirstOrDefaultAsync(c => c.Id == id);
-    if (clip != null && isBot)
+    if (clip == null) return Results.NotFound();
+
+    // Private clips cannot be previewed by bots or unauthenticated users
+    if (clip.Visibility == "private" && !authService.IsAdmin(context))
+    {
+        return Results.NotFound();
+    }
+
+    if (isBot)
     {
         var scheme = context.Request.Scheme;
         var host = context.Request.Host.Value;

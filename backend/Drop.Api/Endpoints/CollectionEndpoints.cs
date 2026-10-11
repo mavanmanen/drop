@@ -1,5 +1,7 @@
 using Drop.Api.Data;
 using Drop.Api.Models;
+using Drop.Api.Services;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
 namespace Drop.Api.Endpoints;
@@ -13,11 +15,12 @@ public static class CollectionEndpoints
         DateTime CreatedAtUtc,
         int ClipCount,
         string? CoverThumbnailUrl,
+        string Visibility,
         List<ClipEndpoints.ClipDto>? Clips
     );
 
-    public record CreateCollectionRequest(string Name, string? Description);
-    public record UpdateCollectionRequest(string Name, string? Description);
+    public record CreateCollectionRequest(string Name, string? Description, string? Visibility);
+    public record UpdateCollectionRequest(string Name, string? Description, string? Visibility);
     public record AddClipToCollectionRequest(string ClipId);
     public record ReorderClipsRequest(List<string> OrderedClipIds);
 
@@ -25,26 +28,49 @@ public static class CollectionEndpoints
     {
         var group = app.MapGroup("/api/collections").WithTags("Collections");
 
-        // Public: Get all collections
-        group.MapGet("/", async (DropDbContext db) =>
+        // List collections: Public users only see "public"; Admin sees public, unlisted, and private
+        group.MapGet("/", async (
+            DropDbContext db,
+            IAuthService authService,
+            HttpContext httpContext,
+            [FromQuery] string? visibility) =>
         {
-            var collections = await db.Collections
+            var isAdmin = authService.IsAdmin(httpContext);
+
+            IQueryable<Collection> query = db.Collections
                 .Include(c => c.CollectionClips)
-                .ThenInclude(cc => cc.Clip)
+                .ThenInclude(cc => cc.Clip);
+
+            if (!isAdmin)
+            {
+                query = query.Where(c => c.Visibility == "public");
+            }
+            else if (!string.IsNullOrWhiteSpace(visibility))
+            {
+                var norm = ClipEndpoints.NormalizeVisibility(visibility);
+                query = query.Where(c => c.Visibility == norm);
+            }
+
+            var collections = await query
                 .OrderByDescending(c => c.CreatedAtUtc)
                 .ToListAsync();
 
             var dtos = collections.Select(c =>
             {
-                var firstClipWithThumb = c.CollectionClips
+                // Visible clips for cover
+                var visibleClips = isAdmin
+                    ? c.CollectionClips
+                    : c.CollectionClips.Where(cc => cc.Clip.Visibility != "private");
+
+                var firstClipWithThumb = visibleClips
                     .OrderBy(cc => cc.OrderIndex)
                     .Select(cc => cc.Clip)
                     .FirstOrDefault(clip => !string.IsNullOrEmpty(clip.ThumbnailFileName));
 
                 var coverUrl = firstClipWithThumb != null
                     ? $"/api/clips/{firstClipWithThumb.Id}/thumbnail"
-                    : c.CollectionClips.FirstOrDefault()?.Clip != null
-                        ? $"/api/clips/{c.CollectionClips.First().Clip.Id}/thumbnail"
+                    : visibleClips.FirstOrDefault()?.Clip != null
+                        ? $"/api/clips/{visibleClips.First().Clip.Id}/thumbnail"
                         : null;
 
                 return new CollectionDto(
@@ -52,8 +78,9 @@ public static class CollectionEndpoints
                     Name: c.Name,
                     Description: c.Description,
                     CreatedAtUtc: c.CreatedAtUtc,
-                    ClipCount: c.CollectionClips.Count,
+                    ClipCount: visibleClips.Count(),
                     CoverThumbnailUrl: coverUrl,
+                    Visibility: c.Visibility ?? "public",
                     Clips: null
                 );
             }).ToList();
@@ -61,8 +88,8 @@ public static class CollectionEndpoints
             return Results.Ok(dtos);
         });
 
-        // Public: Get single collection with clips
-        group.MapGet("/{id}", async (string id, DropDbContext db) =>
+        // Get single collection: Public and unlisted can be viewed by anyone with direct link; Private requires admin
+        group.MapGet("/{id}", async (string id, DropDbContext db, IAuthService authService, HttpContext httpContext) =>
         {
             var collection = await db.Collections
                 .Include(c => c.CollectionClips)
@@ -73,7 +100,22 @@ public static class CollectionEndpoints
 
             if (collection == null) return Results.NotFound(new { error = "Collection not found" });
 
-            var orderedClips = collection.CollectionClips
+            var isAdmin = authService.IsAdmin(httpContext);
+
+            // Private collection check
+            if (collection.Visibility == "private" && !isAdmin)
+            {
+                return Results.NotFound(new { error = "Collection not found" });
+            }
+
+            // If viewer is not admin, filter out private clips inside this collection
+            var visibleClipsQuery = collection.CollectionClips.AsEnumerable();
+            if (!isAdmin)
+            {
+                visibleClipsQuery = visibleClipsQuery.Where(cc => cc.Clip.Visibility != "private");
+            }
+
+            var orderedClips = visibleClipsQuery
                 .OrderBy(cc => cc.OrderIndex)
                 .Select(cc => ClipEndpoints.ToDto(cc.Clip))
                 .ToList();
@@ -88,6 +130,7 @@ public static class CollectionEndpoints
                 CreatedAtUtc: collection.CreatedAtUtc,
                 ClipCount: orderedClips.Count,
                 CoverThumbnailUrl: coverUrl,
+                Visibility: collection.Visibility ?? "public",
                 Clips: orderedClips
             );
 
@@ -108,7 +151,8 @@ public static class CollectionEndpoints
                 Id = id,
                 Name = req.Name.Trim(),
                 Description = req.Description?.Trim(),
-                CreatedAtUtc = DateTime.UtcNow
+                CreatedAtUtc = DateTime.UtcNow,
+                Visibility = ClipEndpoints.NormalizeVisibility(req.Visibility)
             };
 
             db.Collections.Add(collection);
@@ -121,6 +165,7 @@ public static class CollectionEndpoints
                 CreatedAtUtc: collection.CreatedAtUtc,
                 ClipCount: 0,
                 CoverThumbnailUrl: null,
+                Visibility: collection.Visibility,
                 Clips: []
             ));
         })
@@ -137,6 +182,10 @@ public static class CollectionEndpoints
                 collection.Name = req.Name.Trim();
             }
             collection.Description = req.Description?.Trim();
+            if (!string.IsNullOrWhiteSpace(req.Visibility))
+            {
+                collection.Visibility = ClipEndpoints.NormalizeVisibility(req.Visibility);
+            }
 
             await db.SaveChangesAsync();
 
@@ -144,7 +193,8 @@ public static class CollectionEndpoints
             {
                 id = collection.Id,
                 name = collection.Name,
-                description = collection.Description
+                description = collection.Description,
+                visibility = collection.Visibility
             });
         })
         .RequireAuthorization();

@@ -13,6 +13,7 @@ public class Clip
     public string? ThumbnailFileName { get; set; }
     public DateTime CreatedAtUtc { get; set; } = DateTime.UtcNow;
     public long ViewsCount { get; set; } = 0;
+    public string Visibility { get; set; } = "public"; // public, unlisted, private
 
     public List<CollectionClip> CollectionClips { get; set; } = [];
 }

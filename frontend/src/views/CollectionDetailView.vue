@@ -20,7 +20,10 @@ import {
   ChevronDown,
   Clock,
   Eye,
-  SkipForward
+  SkipForward,
+  Globe,
+  Link2,
+  Lock
 } from '@lucide/vue';
 
 const route = useRoute();
@@ -172,7 +175,15 @@ onMounted(() => {
             <div class="col-meta">
               <span class="badge badge-violet">{{ clips.length }} clips</span>
               <span class="meta-dot">•</span>
-              <span>Public Collection</span>
+              <span
+                class="badge"
+                :class="collection.visibility === 'public' ? 'badge-cyan' : collection.visibility === 'unlisted' ? 'badge-amber' : 'badge-rose'"
+              >
+                <Globe v-if="collection.visibility === 'public'" :size="11" />
+                <Link2 v-else-if="collection.visibility === 'unlisted'" :size="11" />
+                <Lock v-else :size="11" />
+                <span>{{ collection.visibility }}</span>
+              </span>
             </div>
           </div>
         </div>

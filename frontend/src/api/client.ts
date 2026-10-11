@@ -3,6 +3,8 @@ export interface ClipCollectionSummary {
   name: string;
 }
 
+export type Visibility = 'public' | 'unlisted' | 'private';
+
 export interface Clip {
   id: string;
   title: string;
@@ -16,6 +18,7 @@ export interface Clip {
   thumbnailUrl: string | null;
   createdAtUtc: string;
   viewsCount: number;
+  visibility: Visibility;
   collections: ClipCollectionSummary[];
 }
 
@@ -33,6 +36,7 @@ export interface Collection {
   createdAtUtc: string;
   clipCount: number;
   coverThumbnailUrl: string | null;
+  visibility: Visibility;
   clips?: Clip[];
 }
 
@@ -128,10 +132,17 @@ class ApiClient {
   }
 
   // Clips
-  async getClips(params?: { search?: string; collectionId?: string; page?: number; pageSize?: number }): Promise<ClipListResponse> {
+  async getClips(params?: {
+    search?: string;
+    collectionId?: string;
+    visibility?: string;
+    page?: number;
+    pageSize?: number;
+  }): Promise<ClipListResponse> {
     const query = new URLSearchParams();
     if (params?.search) query.set('search', params.search);
     if (params?.collectionId) query.set('collectionId', params.collectionId);
+    if (params?.visibility) query.set('visibility', params.visibility);
     if (params?.page) query.set('page', params.page.toString());
     if (params?.pageSize) query.set('pageSize', params.pageSize.toString());
 
@@ -143,7 +154,7 @@ class ApiClient {
     return this.request<Clip>(`/clips/${id}`);
   }
 
-  async updateClip(id: string, data: { title: string; description?: string | null }): Promise<Clip> {
+  async updateClip(id: string, data: { title: string; description?: string | null; visibility?: string }): Promise<Clip> {
     return this.request<Clip>(`/clips/${id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
@@ -200,15 +211,16 @@ class ApiClient {
   }
 
   // Collections
-  async getCollections(): Promise<Collection[]> {
-    return this.request<Collection[]>('/collections');
+  async getCollections(params?: { visibility?: string }): Promise<Collection[]> {
+    const qs = params?.visibility ? `?visibility=${encodeURIComponent(params.visibility)}` : '';
+    return this.request<Collection[]>(`/collections${qs}`);
   }
 
   async getCollection(id: string): Promise<Collection> {
     return this.request<Collection>(`/collections/${id}`);
   }
 
-  async createCollection(data: { name: string; description?: string }): Promise<Collection> {
+  async createCollection(data: { name: string; description?: string; visibility?: string }): Promise<Collection> {
     return this.request<Collection>('/collections', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -216,7 +228,7 @@ class ApiClient {
     });
   }
 
-  async updateCollection(id: string, data: { name: string; description?: string }): Promise<void> {
+  async updateCollection(id: string, data: { name: string; description?: string; visibility?: string }): Promise<void> {
     await this.request(`/collections/${id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },

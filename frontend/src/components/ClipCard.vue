@@ -2,7 +2,7 @@
 import { ref } from 'vue';
 import type { Clip } from '../api/client';
 import { useToast } from '../stores/toast';
-import { Play, Copy, Check, Eye, Clock, Folder } from '@lucide/vue';
+import { Play, Copy, Check, Eye, Clock, Folder, Lock, Link2 } from '@lucide/vue';
 
 const props = defineProps<{
   clip: Clip;
@@ -66,6 +66,13 @@ async function copyShareLink(e: Event) {
         <div class="play-bubble">
           <Play :size="24" class="play-icon" />
         </div>
+      </div>
+
+      <!-- Visibility badge (unlisted or private) -->
+      <div v-if="clip.visibility !== 'public'" class="visibility-badge" :class="`vis-${clip.visibility}`">
+        <Lock v-if="clip.visibility === 'private'" :size="10" />
+        <Link2 v-else :size="10" />
+        <span>{{ clip.visibility }}</span>
       </div>
 
       <!-- Duration badge -->
@@ -205,6 +212,33 @@ async function copyShareLink(e: Event) {
     display: flex;
     align-items: center;
     gap: 0.25rem;
+  }
+
+  .visibility-badge {
+    position: absolute;
+    top: 0.6rem;
+    left: 0.6rem;
+    padding: 0.2rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.68rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+    backdrop-filter: blur(4px);
+    z-index: 5;
+
+    &.vis-unlisted {
+      background: rgba(245, 158, 11, 0.9);
+      color: #0f172a;
+    }
+
+    &.vis-private {
+      background: rgba(244, 63, 94, 0.9);
+      color: #ffffff;
+    }
   }
 
   .copy-quick-btn {

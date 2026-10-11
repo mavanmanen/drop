@@ -18,7 +18,10 @@ import {
   Clock,
   HardDrive,
   FileVideo,
-  ArrowLeft
+  ArrowLeft,
+  Lock,
+  Link2,
+  Globe
 } from '@lucide/vue';
 
 const route = useRoute();
@@ -31,6 +34,7 @@ const isLoading = ref(true);
 const isEditing = ref(false);
 const editTitle = ref('');
 const editDescription = ref('');
+const editVisibility = ref<'public' | 'unlisted' | 'private'>('public');
 const allCollections = ref<Collection[]>([]);
 const selectedNewColId = ref('');
 const isCopying = ref(false);
@@ -43,6 +47,7 @@ async function loadClip() {
     clip.value = await api.getClip(clipId.value);
     editTitle.value = clip.value.title;
     editDescription.value = clip.value.description || '';
+    editVisibility.value = clip.value.visibility || 'public';
   } catch (err: any) {
     console.error('Failed to load clip', err);
     toastError('Clip not found');
@@ -81,6 +86,7 @@ async function saveEdit() {
     const updated = await api.updateClip(clip.value.id, {
       title: editTitle.value.trim(),
       description: editDescription.value.trim() || null,
+      visibility: editVisibility.value,
     });
     clip.value = updated;
     isEditing.value = false;
@@ -190,7 +196,18 @@ watch(
         <div class="clip-header-card">
           <template v-if="!isEditing">
             <div class="title-and-actions">
-              <h1 class="clip-main-title">{{ clip.title }}</h1>
+              <div class="title-with-badge">
+                <h1 class="clip-main-title">{{ clip.title }}</h1>
+                <span
+                  class="badge"
+                  :class="clip.visibility === 'public' ? 'badge-cyan' : clip.visibility === 'unlisted' ? 'badge-amber' : 'badge-rose'"
+                >
+                  <Globe v-if="clip.visibility === 'public'" :size="12" />
+                  <Link2 v-else-if="clip.visibility === 'unlisted'" :size="12" />
+                  <Lock v-else :size="12" />
+                  <span>{{ clip.visibility }}</span>
+                </span>
+              </div>
               <div v-if="auth.isAuthenticated" class="admin-quick-actions">
                 <button class="btn btn-secondary btn-sm" @click="isEditing = true">
                   <Edit3 :size="14" />
@@ -218,6 +235,26 @@ watch(
               <div class="form-group">
                 <label>Description</label>
                 <textarea v-model="editDescription" rows="3" class="form-textarea"></textarea>
+              </div>
+              <div class="form-group">
+                <label>Visibility</label>
+                <div class="vis-edit-options">
+                  <label class="vis-pill-label" :class="{ active: editVisibility === 'public' }">
+                    <input type="radio" v-model="editVisibility" value="public" class="vis-radio" />
+                    <Globe :size="13" />
+                    <span>Public</span>
+                  </label>
+                  <label class="vis-pill-label" :class="{ active: editVisibility === 'unlisted' }">
+                    <input type="radio" v-model="editVisibility" value="unlisted" class="vis-radio" />
+                    <Link2 :size="13" />
+                    <span>Unlisted</span>
+                  </label>
+                  <label class="vis-pill-label" :class="{ active: editVisibility === 'private' }">
+                    <input type="radio" v-model="editVisibility" value="private" class="vis-radio" />
+                    <Lock :size="13" />
+                    <span>Private</span>
+                  </label>
+                </div>
               </div>
               <div class="edit-actions">
                 <button type="button" class="btn btn-secondary btn-sm" @click="isEditing = false">
@@ -256,9 +293,18 @@ watch(
         <div class="side-card share-card">
           <h3>
             <Share2 :size="16" class="card-icon" />
-            <span>Public Share Link</span>
+            <span>Share Link</span>
           </h3>
-          <p class="share-hint">Anyone with this link can watch or embed this clip:</p>
+
+          <div v-if="clip.visibility === 'private'" class="visibility-notice private-notice">
+            <Lock :size="15" />
+            <span>This clip is <strong>Private</strong>. Only you (the admin) can access or view it. Public links will return Not Found.</span>
+          </div>
+          <div v-else-if="clip.visibility === 'unlisted'" class="visibility-notice unlisted-notice">
+            <Link2 :size="15" />
+            <span>This clip is <strong>Unlisted</strong>. It is hidden from browse lists, but anyone with this direct link can view it.</span>
+          </div>
+          <p v-else class="share-hint">Anyone with this link can watch or embed this clip:</p>
 
           <div class="share-input-group">
             <input
@@ -433,6 +479,13 @@ export default {
     justify-content: space-between;
     gap: 1rem;
 
+    .title-with-badge {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 0.65rem;
+    }
+
     .clip-main-title {
       font-size: 1.5rem;
       font-weight: 800;
@@ -444,6 +497,43 @@ export default {
     .admin-quick-actions {
       display: flex;
       gap: 0.5rem;
+    }
+  }
+
+  .vis-edit-options {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.5rem;
+  }
+
+  .vis-pill-label {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+    padding: 0.45rem 0.6rem;
+    border-radius: $radius-md;
+    border: 1px solid $border-medium;
+    background: $bg-input;
+    color: $text-secondary;
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all $transition-fast;
+
+    .vis-radio {
+      display: none;
+    }
+
+    &:hover {
+      background: $bg-surface-elevated;
+      color: $text-primary;
+    }
+
+    &.active {
+      background: rgba(0, 242, 254, 0.12);
+      border-color: $accent-cyan;
+      color: $accent-cyan;
     }
   }
 
@@ -533,6 +623,29 @@ export default {
 }
 
 .share-card {
+  .visibility-notice {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5rem;
+    padding: 0.6rem 0.75rem;
+    border-radius: $radius-md;
+    font-size: 0.78rem;
+    line-height: 1.4;
+    margin-bottom: 0.35rem;
+
+    &.private-notice {
+      background: rgba($accent-rose, 0.12);
+      border: 1px solid rgba($accent-rose, 0.3);
+      color: #fda4af;
+    }
+
+    &.unlisted-notice {
+      background: rgba($accent-amber, 0.12);
+      border: 1px solid rgba($accent-amber, 0.3);
+      color: #fcd34d;
+    }
+  }
+
   .share-hint {
     font-size: 0.8rem;
     color: $text-secondary;

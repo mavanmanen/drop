@@ -2,7 +2,7 @@
 import { ref } from 'vue';
 import { api, type Collection } from '../api/client';
 import { useToast } from '../stores/toast';
-import { FolderPlus, X, Folder } from '@lucide/vue';
+import { FolderPlus, X, Folder, Globe, Link2, Lock } from '@lucide/vue';
 
 const props = defineProps<{
   collection?: Collection | null;
@@ -17,6 +17,7 @@ const { success, error: toastError } = useToast();
 
 const name = ref(props.collection?.name || '');
 const description = ref(props.collection?.description || '');
+const visibility = ref<'public' | 'unlisted' | 'private'>(props.collection?.visibility || 'public');
 const isLoading = ref(false);
 const errorMessage = ref('');
 
@@ -36,17 +37,20 @@ async function handleSubmit() {
       await api.updateCollection(props.collection.id, {
         name: name.value.trim(),
         description: description.value.trim() || undefined,
+        visibility: visibility.value,
       });
       success(`Collection "${name.value}" updated!`);
       emit('saved', {
         ...props.collection,
         name: name.value.trim(),
         description: description.value.trim() || null,
+        visibility: visibility.value,
       });
     } else {
       const created = await api.createCollection({
         name: name.value.trim(),
         description: description.value.trim() || undefined,
+        visibility: visibility.value,
       });
       success(`Collection "${created.name}" created!`);
       emit('saved', created);
@@ -106,6 +110,34 @@ async function handleSubmit() {
             placeholder="Brief summary of this highlight reel..."
             class="form-textarea"
           ></textarea>
+        </div>
+
+        <div class="form-group">
+          <label>Visibility</label>
+          <div class="vis-options">
+            <label class="vis-pill-label" :class="{ active: visibility === 'public' }">
+              <input type="radio" v-model="visibility" value="public" class="vis-radio" />
+              <Globe :size="14" />
+              <span>Public</span>
+            </label>
+            <label class="vis-pill-label" :class="{ active: visibility === 'unlisted' }">
+              <input type="radio" v-model="visibility" value="unlisted" class="vis-radio" />
+              <Link2 :size="14" />
+              <span>Unlisted</span>
+            </label>
+            <label class="vis-pill-label" :class="{ active: visibility === 'private' }">
+              <input type="radio" v-model="visibility" value="private" class="vis-radio" />
+              <Lock :size="14" />
+              <span>Private</span>
+            </label>
+          </div>
+          <span class="vis-hint">
+            {{
+              visibility === 'public' ? 'Visible to everyone in the collections directory.' :
+              visibility === 'unlisted' ? 'Hidden from directory; accessible only via direct share link.' :
+              'Only visible to you (admin). Link is blocked for public viewers.'
+            }}
+          </span>
         </div>
 
         <div class="modal-actions">
@@ -211,6 +243,51 @@ async function handleSubmit() {
       font-weight: 600;
       color: $text-secondary;
     }
+  }
+
+  .vis-options {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.5rem;
+  }
+
+  .vis-pill-label {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.45rem;
+    padding: 0.5rem 0.65rem;
+    border-radius: $radius-md;
+    border: 1px solid $border-medium;
+    background: $bg-input;
+    color: $text-secondary;
+    font-size: 0.82rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all $transition-fast;
+
+    .vis-radio {
+      display: none;
+    }
+
+    &:hover {
+      background: $bg-surface-elevated;
+      color: $text-primary;
+    }
+
+    &.active {
+      background: rgba(139, 92, 246, 0.15);
+      border-color: $accent-violet;
+      color: #c4b5fd;
+      box-shadow: 0 0 12px $accent-violet-glow;
+    }
+  }
+
+  .vis-hint {
+    font-size: 0.75rem;
+    color: $text-muted;
+    margin-top: 0.2rem;
+    line-height: 1.4;
   }
 }
 

@@ -3,9 +3,11 @@ import { ref, onMounted, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import { api, type Clip, type Collection } from '../api/client';
 import ClipCard from '../components/ClipCard.vue';
-import { Film, Folder, Sparkles, RefreshCw, HardDrive } from '@lucide/vue';
+import { useAuth } from '../stores/auth';
+import { Film, Folder, Sparkles, RefreshCw, HardDrive, Globe, Link2, Lock } from '@lucide/vue';
 
 const route = useRoute();
+const { state: auth } = useAuth();
 
 const clips = ref<Clip[]>([]);
 const collections = ref<Collection[]>([]);
@@ -14,6 +16,7 @@ const currentPage = ref(1);
 const pageSize = 24;
 const isLoading = ref(true);
 const selectedCollectionId = ref<string>('');
+const selectedVisibility = ref<string>('');
 
 const currentSearch = ref((route.query.q as string) || '');
 
@@ -23,6 +26,7 @@ async function loadClips() {
     const res = await api.getClips({
       search: currentSearch.value || undefined,
       collectionId: selectedCollectionId.value || undefined,
+      visibility: selectedVisibility.value || undefined,
       page: currentPage.value,
       pageSize,
     });
@@ -45,6 +49,12 @@ async function loadCollections() {
 
 function selectCollection(colId: string) {
   selectedCollectionId.value = colId;
+  currentPage.value = 1;
+  loadClips();
+}
+
+function selectVisibility(vis: string) {
+  selectedVisibility.value = vis;
   currentPage.value = 1;
   loadClips();
 }
@@ -114,6 +124,44 @@ watch(
       <button class="btn btn-ghost refresh-btn" title="Refresh clips list" @click="loadClips">
         <RefreshCw :size="15" :class="{ spinning: isLoading }" />
       </button>
+    </div>
+
+    <!-- Admin Visibility Filters -->
+    <div v-if="auth.isAuthenticated" class="admin-vis-bar">
+      <span class="admin-vis-label">Visibility:</span>
+      <div class="admin-vis-chips">
+        <button
+          class="vis-chip"
+          :class="{ active: selectedVisibility === '' }"
+          @click="selectVisibility('')"
+        >
+          All
+        </button>
+        <button
+          class="vis-chip"
+          :class="{ active: selectedVisibility === 'public' }"
+          @click="selectVisibility('public')"
+        >
+          <Globe :size="12" />
+          <span>Public</span>
+        </button>
+        <button
+          class="vis-chip"
+          :class="{ active: selectedVisibility === 'unlisted' }"
+          @click="selectVisibility('unlisted')"
+        >
+          <Link2 :size="12" />
+          <span>Unlisted</span>
+        </button>
+        <button
+          class="vis-chip"
+          :class="{ active: selectedVisibility === 'private' }"
+          @click="selectVisibility('private')"
+        >
+          <Lock :size="12" />
+          <span>Private</span>
+        </button>
+      </div>
     </div>
 
     <!-- Search Active Notice -->
@@ -288,6 +336,57 @@ watch(
   .refresh-btn {
     padding: 0.45rem;
     border-radius: 50%;
+  }
+}
+
+.admin-vis-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem 0.85rem;
+  margin-bottom: 1.25rem;
+  background: rgba(18, 23, 35, 0.6);
+  border: 1px dashed rgba(255, 255, 255, 0.12);
+  border-radius: $radius-md;
+
+  .admin-vis-label {
+    font-size: 0.78rem;
+    font-weight: 700;
+    color: $text-muted;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .admin-vis-chips {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+
+    .vis-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.3rem;
+      padding: 0.25rem 0.65rem;
+      border-radius: $radius-sm;
+      font-size: 0.75rem;
+      font-weight: 600;
+      background: $bg-input;
+      border: 1px solid $border-subtle;
+      color: $text-secondary;
+      cursor: pointer;
+      transition: all $transition-fast;
+
+      &:hover {
+        background: $bg-surface-elevated;
+        color: $text-primary;
+      }
+
+      &.active {
+        background: rgba(0, 242, 254, 0.12);
+        border-color: $accent-cyan;
+        color: $accent-cyan;
+      }
+    }
   }
 }
 
