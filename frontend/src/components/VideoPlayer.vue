@@ -254,10 +254,14 @@ defineExpose({
       </div>
     </div>
 
-    <!-- Controls Overlay -->
-    <div class="controls-overlay" :class="{ visible: showControls || !isPlaying }">
+    <!-- Controls Overlay: clicking empty/gradient area toggles playback -->
+    <div
+      class="controls-overlay"
+      :class="{ visible: showControls || !isPlaying }"
+      @click.self="togglePlay"
+    >
       <!-- Scrub Bar -->
-      <div class="scrub-container">
+      <div class="scrub-container" @click.stop>
         <input
           type="range"
           min="0"
@@ -274,7 +278,7 @@ defineExpose({
       </div>
 
       <!-- Controls Bottom Bar -->
-      <div class="controls-bar">
+      <div class="controls-bar" @click.stop>
         <div class="left-controls">
           <!-- Play / Pause -->
           <button class="ctrl-btn" :title="isPlaying ? 'Pause (Space)' : 'Play (Space)'" @click="togglePlay">
@@ -456,6 +460,7 @@ defineExpose({
   opacity: 0;
   transition: opacity 0.25s ease;
   pointer-events: none;
+  cursor: pointer;
 
   &.visible {
     opacity: 1;
@@ -515,6 +520,7 @@ defineExpose({
   align-items: center;
   justify-content: space-between;
   padding: 0.5rem 1rem 0.75rem;
+  cursor: default;
 
   .left-controls, .right-controls {
     display: flex;
