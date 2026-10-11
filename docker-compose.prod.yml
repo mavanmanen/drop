@@ -2,15 +2,14 @@
 # Production Docker Compose for Drop (Gaming Clip Sharing Platform)
 #
 # Usage:
-#   1. Replace ghcr.io/<owner>/drop:latest with your image tag (or username)
-#   2. Set a strong DROP_ADMIN_PASSWORD and DROP_JWT_SECRET
-#   3. Run: docker compose -f docker-compose.prod.yml up -d
+#   1. Set a strong DROP_ADMIN_PASSWORD and DROP_JWT_SECRET
+#   2. Run: docker compose -f docker-compose.prod.yml up -d
 # ==============================================================================
 
 services:
   drop:
-    # Pre-built production container image from GitHub Container Registry (or Docker Hub)
-    image: ghcr.io/<owner>/drop:latest
+    # Pre-built production container image from GitHub Container Registry
+    image: ghcr.io/mavanmanen/drop:latest
     container_name: drop-app
     restart: unless-stopped
     ports:
