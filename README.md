@@ -107,7 +107,7 @@ cp .env.example .env
 | `DROP_POSTGRES_PASSWORD` | `postgres` | PostgreSQL password |
 | `DROP_INGEST_DEFAULT_VISIBILITY` | `public` | Default visibility for ingested clips (`public`, `unlisted`, `private`) |
 | `GEMINI_API_KEY` | *(optional)* | Google Gemini API key for on-demand AI video analysis |
-| `GEMINI_MODEL` | `gemini-3.8-flash` | Gemini model used for multimodal video analysis |
+| `GEMINI_MODEL` | `gemini-3.8-flash` | Optional fallback Gemini model (models can also be selected directly in the UI during analysis) |
 
 ### 5. Running with PostgreSQL
 

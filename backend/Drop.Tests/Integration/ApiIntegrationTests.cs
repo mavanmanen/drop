@@ -385,10 +385,27 @@ public class ApiIntegrationTests : IClassFixture<CustomWebApplicationFactory>
         Assert.Equal(HttpStatusCode.OK, aiStatusResp.StatusCode);
         var aiStatusJson = await aiStatusResp.Content.ReadFromJsonAsync<JsonElement>();
         Assert.True(aiStatusJson.TryGetProperty("isConfigured", out _));
+        Assert.True(aiStatusJson.TryGetProperty("availableModels", out var modelsArr));
+        Assert.Contains(modelsArr.EnumerateArray(), m => m.GetString() == "gemini-3.8-flash");
 
         // Anonymous call to ai-status returns Unauthorized
         var anonClient = CreateAnonymousClient();
         var anonAiResp = await anonClient.GetAsync("/api/clips/ai-status");
         Assert.Equal(HttpStatusCode.Unauthorized, anonAiResp.StatusCode);
+
+        // Verify persisting AI analysis onto clip
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<DropDbContext>();
+            var clip = await db.Clips.FindAsync(clipId);
+            clip!.AiAnalysisJson = "{\"tags\":[\"clutch\",\"sniper\"],\"subClips\":[{\"title\":\"Headshot\",\"description\":\"Crisp shot\",\"startSeconds\":10.5,\"endSeconds\":18.0}],\"summary\":\"Great clutch moment\"}";
+            await db.SaveChangesAsync();
+        }
+
+        var clipWithAiResp = await adminClient.GetFromJsonAsync<JsonElement>($"/api/clips/{clipId}");
+        Assert.True(clipWithAiResp.TryGetProperty("latestAiAnalysis", out var latestAi));
+        Assert.Equal(JsonValueKind.Object, latestAi.ValueKind);
+        Assert.Equal("Great clutch moment", latestAi.GetProperty("summary").GetString());
+        Assert.Equal("Headshot", latestAi.GetProperty("subClips")[0].GetProperty("title").GetString());
     }
 }

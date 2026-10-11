@@ -23,6 +23,7 @@ public static class ClipEndpoints
         long ViewsCount,
         string Visibility,
         List<string> Tags,
+        AiClipAnalysisResult? LatestAiAnalysis,
         List<ClipCollectionSummaryDto> Collections,
         ClipSummaryDto? ParentClip,
         List<ClipSummaryDto> ChildClips
@@ -48,7 +49,7 @@ public static class ClipEndpoints
         string? CollectionId,
         List<string>? Tags
     );
-    public record ClipAnalyzeAiRequest(string Mode); // "tags", "subclips", "both"
+    public record ClipAnalyzeAiRequest(string Mode, string? Model = null); // "tags", "subclips", "both"
     public record ClipListResponse(List<ClipDto> Items, int TotalCount, int Page, int PageSize);
 
     public static string NormalizeVisibility(string? v)
@@ -77,6 +78,23 @@ public static class ClipEndpoints
             .Select(t => t.Trim().TrimStart('#'))
             .Distinct(StringComparer.OrdinalIgnoreCase);
         return string.Join(",", clean);
+    }
+
+    public static AiClipAnalysisResult? ParseAiAnalysis(string? json)
+    {
+        if (string.IsNullOrWhiteSpace(json)) return null;
+        try
+        {
+            var options = new System.Text.Json.JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true
+            };
+            return System.Text.Json.JsonSerializer.Deserialize<AiClipAnalysisResult>(json, options);
+        }
+        catch
+        {
+            return null;
+        }
     }
 
     public static void MapClipEndpoints(this IEndpointRouteBuilder app)
@@ -480,7 +498,12 @@ public static class ClipEndpoints
                     mimeType: clip.ContentType,
                     durationSeconds: clip.DurationSeconds,
                     promptMode: req.Mode,
+                    model: req.Model,
                     cancellationToken: cancellationToken);
+
+                // Persist the latest AI analysis result to the clip entity
+                clip.AiAnalysisJson = System.Text.Json.JsonSerializer.Serialize(result);
+                await db.SaveChangesAsync(cancellationToken);
 
                 return Results.Ok(result);
             }
@@ -491,10 +514,14 @@ public static class ClipEndpoints
         })
         .RequireAuthorization();
 
-        // Admin: Check Gemini AI configuration status
+        // Admin: Check Gemini AI configuration status and available models
         group.MapGet("/ai-status", (IGeminiAnalysisService geminiService) =>
         {
-            return Results.Ok(new { isConfigured = geminiService.IsConfigured });
+            return Results.Ok(new
+            {
+                isConfigured = geminiService.IsConfigured,
+                availableModels = geminiService.AvailableModels
+            });
         })
         .RequireAuthorization();
 
@@ -529,6 +556,7 @@ public static class ClipEndpoints
         ViewsCount: clip.ViewsCount,
         Visibility: clip.Visibility ?? "public",
         Tags: ParseTags(clip.Tags),
+        LatestAiAnalysis: ParseAiAnalysis(clip.AiAnalysisJson),
         Collections: clip.CollectionClips
             .Where(cc => cc.Collection != null)
             .OrderBy(cc => cc.OrderIndex)

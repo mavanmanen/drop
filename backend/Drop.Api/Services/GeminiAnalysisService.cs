@@ -9,9 +9,18 @@ public class GeminiAnalysisService : IGeminiAnalysisService
 {
     private readonly ILogger<GeminiAnalysisService> _logger;
     private readonly string? _apiKey;
-    private readonly string _model;
+    private readonly string _defaultModel;
+
+    public static readonly string[] SupportedModels =
+    [
+        "gemini-2.5-flash",
+        "gemini-2.5-pro",
+        "gemini-3.8-flash",
+        "gemini-3.8-pro"
+    ];
 
     public bool IsConfigured => !string.IsNullOrWhiteSpace(_apiKey);
+    public IReadOnlyList<string> AvailableModels => SupportedModels;
 
     public GeminiAnalysisService(IConfiguration configuration, ILogger<GeminiAnalysisService> logger)
     {
@@ -19,7 +28,7 @@ public class GeminiAnalysisService : IGeminiAnalysisService
         _apiKey = configuration["GEMINI_API_KEY"]
                   ?? configuration["DROP_GEMINI_API_KEY"]
                   ?? System.Environment.GetEnvironmentVariable("GEMINI_API_KEY");
-        _model = configuration["GEMINI_MODEL"] ?? "gemini-3.8-flash";
+        _defaultModel = configuration["GEMINI_MODEL"] ?? "gemini-3.8-flash";
 
         if (!IsConfigured)
         {
@@ -27,7 +36,7 @@ public class GeminiAnalysisService : IGeminiAnalysisService
         }
         else
         {
-            _logger.LogInformation("GeminiAnalysisService: Initialized with model {Model}.", _model);
+            _logger.LogInformation("GeminiAnalysisService: Initialized (default model: {Model}).", _defaultModel);
         }
     }
 
@@ -36,12 +45,15 @@ public class GeminiAnalysisService : IGeminiAnalysisService
         string mimeType,
         double? durationSeconds,
         string promptMode,
+        string? model = null,
         CancellationToken cancellationToken = default)
     {
         if (!IsConfigured)
         {
             throw new InvalidOperationException("Gemini API key is not configured. Set the GEMINI_API_KEY environment variable to enable AI clip analysis.");
         }
+
+        var targetModel = !string.IsNullOrWhiteSpace(model) ? model.Trim() : _defaultModel;
 
         if (!System.IO.File.Exists(videoFilePath))
         {
@@ -96,7 +108,7 @@ public class GeminiAnalysisService : IGeminiAnalysisService
             }
 
             var promptText = BuildPrompt(mode, durationSeconds);
-            _logger.LogInformation("Sending video analysis request to Gemini model {Model} (mode: {Mode})...", _model, mode);
+            _logger.LogInformation("Sending video analysis request to Gemini model {Model} (mode: {Mode})...", targetModel, mode);
 
             var schemaString = """
             {
@@ -151,7 +163,7 @@ public class GeminiAnalysisService : IGeminiAnalysisService
             };
 
             var response = await client.Models.GenerateContentAsync(
-                model: _model,
+                model: targetModel,
                 contents: new Content { Parts = contentParts },
                 config: config
             );

@@ -42,6 +42,7 @@ export interface Clip {
   viewsCount: number;
   visibility: Visibility;
   tags?: string[];
+  latestAiAnalysis?: AiClipAnalysisResult | null;
   collections: ClipCollectionSummary[];
   parentClip?: ClipSummary | null;
   childClips?: ClipSummary[];
@@ -209,16 +210,16 @@ class ApiClient {
     });
   }
 
-  async analyzeClipAi(id: string, mode: 'tags' | 'subclips' | 'both'): Promise<AiClipAnalysisResult> {
+  async analyzeClipAi(id: string, mode: 'tags' | 'subclips' | 'both', model?: string): Promise<AiClipAnalysisResult> {
     return this.request<AiClipAnalysisResult>(`/clips/${id}/ai-analyze`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ mode }),
+      body: JSON.stringify({ mode, model }),
     });
   }
 
-  async getAiStatus(): Promise<{ isConfigured: boolean }> {
-    return this.request<{ isConfigured: boolean }>('/clips/ai-status');
+  async getAiStatus(): Promise<{ isConfigured: boolean; availableModels?: string[] }> {
+    return this.request<{ isConfigured: boolean; availableModels?: string[] }>('/clips/ai-status');
   }
 
   async uploadClip(

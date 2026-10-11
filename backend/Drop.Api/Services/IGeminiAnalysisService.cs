@@ -16,10 +16,12 @@ public record AiClipAnalysisResult(
 public interface IGeminiAnalysisService
 {
     bool IsConfigured { get; }
+    IReadOnlyList<string> AvailableModels { get; }
     Task<AiClipAnalysisResult> AnalyzeClipAsync(
         string videoFilePath,
         string mimeType,
         double? durationSeconds,
         string promptMode, // "tags", "subclips", or "both"
+        string? model = null,
         CancellationToken cancellationToken = default);
 }

@@ -15,7 +15,8 @@ import {
   AlertCircle,
   Clock,
   Layers,
-  ChevronRight
+  ChevronRight,
+  Cpu
 } from '@lucide/vue';
 
 const props = defineProps<{
@@ -26,18 +27,27 @@ const props = defineProps<{
 const emit = defineEmits<{
   (e: 'close'): void;
   (e: 'tagsUpdated', newTags: string[]): void;
+  (e: 'analysisUpdated', analysis: AiClipAnalysisResult): void;
   (e: 'openTrimWithSuggestion', suggestion: AiSubClipSuggestion): void;
 }>();
 
 const { success, error: toastError } = useToast();
 
 const selectedMode = ref<'both' | 'tags' | 'subclips'>('both');
+const selectedModel = ref<string>('gemini-3.8-flash');
+const availableModels = ref<string[]>([
+  'gemini-3.8-flash',
+  'gemini-3.8-pro',
+  'gemini-2.5-flash',
+  'gemini-2.5-pro'
+]);
 const isAnalyzing = ref(false);
 const isSavingTags = ref(false);
 const analysisResult = ref<AiClipAnalysisResult | null>(null);
 const currentClipTags = ref<string[]>([]);
 const newTagInput = ref('');
 const errorMessage = ref<string | null>(null);
+const hasLoadedSavedResult = ref(false);
 
 function formatSeconds(secs: number): string {
   if (isNaN(secs) || secs < 0) return '0:00';
@@ -46,17 +56,40 @@ function formatSeconds(secs: number): string {
   return `${m}:${s < 10 ? '0' : ''}${s}`;
 }
 
-function initTags() {
+async function loadAiStatus() {
+  try {
+    const status = await api.getAiStatus();
+    if (status.availableModels && status.availableModels.length > 0) {
+      availableModels.value = status.availableModels;
+      if (!status.availableModels.includes(selectedModel.value)) {
+        selectedModel.value = status.availableModels[0];
+      }
+    }
+  } catch (err) {
+    // Keep defaults if status check fails
+  }
+}
+
+function initData() {
   currentClipTags.value = [...(props.clip.tags || [])];
-  analysisResult.value = null;
   errorMessage.value = null;
+
+  // Restore latest saved AI analysis result if available on clip
+  if (props.clip.latestAiAnalysis) {
+    analysisResult.value = props.clip.latestAiAnalysis;
+    hasLoadedSavedResult.value = true;
+  } else {
+    analysisResult.value = null;
+    hasLoadedSavedResult.value = false;
+  }
 }
 
 watch(
   () => props.show,
   (val) => {
     if (val) {
-      initTags();
+      initData();
+      loadAiStatus();
     }
   },
   { immediate: true }
@@ -65,7 +98,7 @@ watch(
 watch(
   () => props.clip,
   () => {
-    initTags();
+    initData();
   }
 );
 
@@ -74,8 +107,10 @@ async function runAnalysis() {
   errorMessage.value = null;
 
   try {
-    const res = await api.analyzeClipAi(props.clip.id, selectedMode.value);
+    const res = await api.analyzeClipAi(props.clip.id, selectedMode.value, selectedModel.value);
     analysisResult.value = res;
+    hasLoadedSavedResult.value = false;
+    emit('analysisUpdated', res);
     success('AI clip analysis complete!');
   } catch (err: any) {
     console.error('AI analysis failed', err);
@@ -171,36 +206,60 @@ onBeforeUnmount(() => {
       <div class="modal-body ai-body">
         <!-- Configuration / Option Bar -->
         <div class="analysis-controls-card">
-          <div class="mode-selector-group">
-            <span class="mode-label">Analysis Mode:</span>
-            <div class="mode-pill-options">
-              <label class="mode-pill" :class="{ active: selectedMode === 'both' }">
-                <input type="radio" v-model="selectedMode" value="both" class="mode-radio" />
-                <Layers :size="14" />
-                <span>Both (Tags & Sub-clips)</span>
-              </label>
-              <label class="mode-pill" :class="{ active: selectedMode === 'tags' }">
-                <input type="radio" v-model="selectedMode" value="tags" class="mode-radio" />
-                <Tag :size="14" />
-                <span>Tags Only</span>
-              </label>
-              <label class="mode-pill" :class="{ active: selectedMode === 'subclips' }">
-                <input type="radio" v-model="selectedMode" value="subclips" class="mode-radio" />
-                <Scissors :size="14" />
-                <span>Sub-clips Only</span>
-              </label>
+          <div class="controls-top-row">
+            <div class="mode-selector-group">
+              <span class="mode-label">Analysis Mode:</span>
+              <div class="mode-pill-options">
+                <label class="mode-pill" :class="{ active: selectedMode === 'both' }">
+                  <input type="radio" v-model="selectedMode" value="both" class="mode-radio" />
+                  <Layers :size="14" />
+                  <span>Both (Tags & Sub-clips)</span>
+                </label>
+                <label class="mode-pill" :class="{ active: selectedMode === 'tags' }">
+                  <input type="radio" v-model="selectedMode" value="tags" class="mode-radio" />
+                  <Tag :size="14" />
+                  <span>Tags Only</span>
+                </label>
+                <label class="mode-pill" :class="{ active: selectedMode === 'subclips' }">
+                  <input type="radio" v-model="selectedMode" value="subclips" class="mode-radio" />
+                  <Scissors :size="14" />
+                  <span>Sub-clips Only</span>
+                </label>
+              </div>
+            </div>
+
+            <div class="model-selector-group">
+              <span class="mode-label">Model:</span>
+              <div class="model-select-wrapper">
+                <Cpu :size="14" class="model-select-icon" />
+                <select v-model="selectedModel" class="form-select form-select-sm model-dropdown">
+                  <option v-for="m in availableModels" :key="m" :value="m">
+                    {{ m }}
+                  </option>
+                </select>
+              </div>
             </div>
           </div>
 
-          <button
-            class="btn btn-primary btn-run-ai"
-            :disabled="isAnalyzing"
-            @click="runAnalysis"
-          >
-            <Loader2 v-if="isAnalyzing" :size="16" class="spin-icon" />
-            <Sparkles v-else :size="16" />
-            <span>{{ isAnalyzing ? 'Analyzing Clip with Gemini...' : 'Analyze Clip' }}</span>
-          </button>
+          <div class="controls-action-row">
+            <div v-if="hasLoadedSavedResult" class="saved-analysis-badge">
+              <Sparkles :size="13" />
+              <span>Loaded previous analysis result. You can re-run to regenerate.</span>
+            </div>
+            <div v-else class="controls-tip-text">
+              Select mode & model, then click analyze to run multimodal inference.
+            </div>
+
+            <button
+              class="btn btn-primary btn-run-ai"
+              :disabled="isAnalyzing"
+              @click="runAnalysis"
+            >
+              <Loader2 v-if="isAnalyzing" :size="16" class="spin-icon" />
+              <Sparkles v-else :size="16" />
+              <span>{{ isAnalyzing ? 'Analyzing Clip...' : (analysisResult ? 'Re-run Analysis' : 'Analyze Clip') }}</span>
+            </button>
+          </div>
         </div>
 
         <!-- Error display -->
@@ -214,7 +273,7 @@ onBeforeUnmount(() => {
           <div class="ai-orb">
             <Sparkles :size="32" class="sparkle-pulse" />
           </div>
-          <h3>Gemini is watching and analyzing your clip...</h3>
+          <h3>Gemini ({{ selectedModel }}) is watching and analyzing your clip...</h3>
           <p>Processing visual action, audio events, and generating suggestions.</p>
         </div>
 
@@ -451,14 +510,20 @@ onBeforeUnmount(() => {
 
 .analysis-controls-card {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
+  flex-direction: column;
   gap: 1rem;
-  flex-wrap: wrap;
   background: $bg-card;
   border: 1px solid $border-subtle;
   border-radius: $radius-md;
   padding: 1rem 1.25rem;
+
+  .controls-top-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    flex-wrap: wrap;
+  }
 
   .mode-selector-group {
     display: flex;
@@ -512,12 +577,86 @@ onBeforeUnmount(() => {
     }
   }
 
-  .btn-run-ai {
-    padding: 0.55rem 1.25rem;
-    font-weight: 700;
-    display: inline-flex;
+  .model-selector-group {
+    display: flex;
     align-items: center;
     gap: 0.5rem;
+
+    .mode-label {
+      font-size: 0.82rem;
+      font-weight: 700;
+      color: $text-secondary;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .model-select-wrapper {
+      position: relative;
+      display: inline-flex;
+      align-items: center;
+
+      .model-select-icon {
+        position: absolute;
+        left: 0.65rem;
+        color: $accent-cyan;
+        pointer-events: none;
+      }
+
+      .model-dropdown {
+        padding-left: 2rem;
+        padding-right: 2rem;
+        height: 32px;
+        font-size: 0.8rem;
+        font-weight: 600;
+        background: $bg-input;
+        border-color: $border-medium;
+        color: $text-primary;
+        border-radius: $radius-sm;
+
+        &:focus {
+          border-color: $accent-cyan;
+          outline: none;
+          box-shadow: 0 0 0 2px rgba(0, 242, 254, 0.2);
+        }
+      }
+    }
+  }
+
+  .controls-action-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    flex-wrap: wrap;
+    padding-top: 0.75rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+
+    .saved-analysis-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      font-size: 0.78rem;
+      font-weight: 600;
+      color: #93c5fd;
+      background: rgba(59, 130, 246, 0.12);
+      border: 1px solid rgba(59, 130, 246, 0.25);
+      padding: 0.3rem 0.65rem;
+      border-radius: 12px;
+    }
+
+    .controls-tip-text {
+      font-size: 0.8rem;
+      color: $text-muted;
+    }
+
+    .btn-run-ai {
+      padding: 0.55rem 1.25rem;
+      font-weight: 700;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      margin-left: auto;
+    }
   }
 }
 

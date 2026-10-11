@@ -7,6 +7,10 @@ vi.mock('../../api/client', () => ({
   api: {
     analyzeClipAi: vi.fn(),
     updateClip: vi.fn(),
+    getAiStatus: vi.fn().mockResolvedValue({
+      isConfigured: true,
+      availableModels: ['gemini-3.8-flash', 'gemini-3.8-pro', 'gemini-2.5-flash']
+    }),
   },
 }));
 
@@ -91,7 +95,7 @@ describe('AiAnalysisModal.vue', () => {
     const runBtn = wrapper.find('.btn-run-ai');
     await runBtn.trigger('click');
 
-    expect(api.analyzeClipAi).toHaveBeenCalledWith('testclip1', 'both');
+    expect(api.analyzeClipAi).toHaveBeenCalledWith('testclip1', 'both', 'gemini-3.8-flash');
 
     // Wait for promise resolution
     await wrapper.vm.$nextTick();
@@ -101,6 +105,37 @@ describe('AiAnalysisModal.vue', () => {
     expect(wrapper.text()).toContain('#clutch');
     expect(wrapper.text()).toContain('#ace');
     expect(wrapper.text()).toContain('Player hits four consecutive sniper shots');
+  });
+
+  it('automatically loads latestAiAnalysis when opening modal with previously saved results', () => {
+    const clipWithSavedAi: Clip = {
+      ...sampleClip,
+      latestAiAnalysis: {
+        tags: ['persistedtag'],
+        subClips: [
+          {
+            title: 'Saved Highlight',
+            description: 'Loaded from database',
+            startSeconds: 12.0,
+            endSeconds: 20.0,
+          },
+        ],
+        summary: 'Saved summary analysis from earlier.',
+      },
+    };
+
+    const wrapper = mount(AiAnalysisModal, {
+      props: {
+        show: true,
+        clip: clipWithSavedAi,
+      },
+    });
+
+    expect(wrapper.text()).toContain('Loaded previous analysis result');
+    expect(wrapper.text()).toContain('Saved Highlight');
+    expect(wrapper.text()).toContain('#persistedtag');
+    expect(wrapper.text()).toContain('Saved summary analysis from earlier.');
+    expect(wrapper.text()).toContain('Re-run Analysis');
   });
 
   it('emits openTrimWithSuggestion when clicking Open in Cut Tool', async () => {

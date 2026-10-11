@@ -85,6 +85,12 @@ function onTagsUpdated(newTags: string[]) {
   }
 }
 
+function onAnalysisUpdated(analysis: any) {
+  if (clip.value) {
+    clip.value.latestAiAnalysis = analysis;
+  }
+}
+
 async function loadClip() {
   isLoading.value = true;
   try {
@@ -572,6 +578,7 @@ watch(
       :clip="clip"
       @close="isAiAnalyzing = false"
       @tags-updated="onTagsUpdated"
+      @analysis-updated="onAnalysisUpdated"
       @open-trim-with-suggestion="openTrimWithSuggestion"
     />
   </div>
