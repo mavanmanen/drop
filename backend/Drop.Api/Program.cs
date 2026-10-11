@@ -55,6 +55,7 @@ builder.Services.AddDbContext<DropDbContext>(options =>
     options.UseSqlite(connectionString));
 
 // Register Application Services
+builder.Services.AddHealthChecks();
 builder.Services.AddSingleton<IAuthService, AuthService>();
 builder.Services.AddSingleton<IMediaStorageService, MediaStorageService>();
 builder.Services.AddHostedService<IngestWatcherService>();
@@ -138,6 +139,7 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 // Map API Endpoints
+app.MapHealthChecks("/health");
 app.MapAuthEndpoints();
 app.MapClipEndpoints();
 app.MapCollectionEndpoints();

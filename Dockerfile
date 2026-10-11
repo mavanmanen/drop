@@ -33,9 +33,9 @@ RUN dotnet publish -c Release -o /app/publish /p:UseAppHost=false
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
 WORKDIR /app
 
-# Install ffmpeg for automatic clip thumbnail generation & duration probing
+# Install ffmpeg for automatic clip thumbnail generation & duration probing, and curl for healthchecks
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends ffmpeg && \
+    apt-get install -y --no-install-recommends ffmpeg curl && \
     rm -rf /var/lib/apt/lists/*
 
 # Create persistent data directories
@@ -55,5 +55,8 @@ ENV ASPNETCORE_URLS=http://+:8080 \
 
 VOLUME ["/data"]
 EXPOSE 8080
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+    CMD curl -f http://localhost:8080/health || exit 1
 
 ENTRYPOINT ["dotnet", "Drop.Api.dll"]

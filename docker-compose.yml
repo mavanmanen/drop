@@ -30,3 +30,10 @@ services:
       - ./data/thumbnails:/data/thumbnails
       # SQLite database file
       - ./data/db:/data/db
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/health || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
