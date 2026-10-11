@@ -186,6 +186,31 @@ watch(
     }
   }
 );
+
+function seekTo(time: number) {
+  if (videoRef.value) {
+    videoRef.value.currentTime = time;
+    currentTime.value = time;
+  }
+}
+
+function play() {
+  videoRef.value?.play();
+}
+
+function pause() {
+  videoRef.value?.pause();
+}
+
+defineExpose({
+  videoRef,
+  currentTime,
+  duration,
+  isPlaying,
+  seekTo,
+  play,
+  pause,
+});
 </script>
 
 <template>

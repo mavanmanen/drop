@@ -21,17 +21,21 @@ import {
   ArrowLeft,
   Lock,
   Link2,
-  Globe
+  Globe,
+  Scissors
 } from '@lucide/vue';
+import TrimModal from '../components/TrimModal.vue';
 
 const route = useRoute();
 const router = useRouter();
 const { state: auth } = useAuth();
 const { success, error: toastError } = useToast();
 
+const playerRef = ref<InstanceType<typeof VideoPlayer> | null>(null);
 const clip = ref<Clip | null>(null);
 const isLoading = ref(true);
 const isEditing = ref(false);
+const isTrimming = ref(false);
 const editTitle = ref('');
 const editDescription = ref('');
 const editVisibility = ref<'public' | 'unlisted' | 'private'>('public');
@@ -40,6 +44,10 @@ const selectedNewColId = ref('');
 const isCopying = ref(false);
 
 const clipId = computed(() => route.params.id as string);
+
+function onClipTrimmed(newClip: Clip) {
+  router.push(`/clip/${newClip.id}`);
+}
 
 async function loadClip() {
   isLoading.value = true;
@@ -187,6 +195,7 @@ watch(
       <!-- Player column -->
       <div class="player-column">
         <VideoPlayer
+          ref="playerRef"
           :src="clip.videoUrl"
           :poster="clip.thumbnailUrl || undefined"
           :autoplay="true"
@@ -209,6 +218,10 @@ watch(
                 </span>
               </div>
               <div v-if="auth.isAuthenticated" class="admin-quick-actions">
+                <button class="btn btn-secondary btn-sm btn-trim" @click="isTrimming = true">
+                  <Scissors :size="14" />
+                  <span>Cut Clip</span>
+                </button>
                 <button class="btn btn-secondary btn-sm" @click="isEditing = true">
                   <Edit3 :size="14" />
                   <span>Edit</span>
@@ -405,6 +418,17 @@ watch(
       <p>This clip may have been removed or the link is incorrect.</p>
       <router-link to="/" class="btn btn-primary">Return Home</router-link>
     </div>
+
+    <!-- Trim Modal (Admin only) -->
+    <TrimModal
+      v-if="clip && auth.isAuthenticated"
+      :show="isTrimming"
+      :source-clip="clip"
+      :all-collections="allCollections"
+      :initial-current-time="playerRef?.currentTime ?? 0"
+      @close="isTrimming = false"
+      @trimmed="onClipTrimmed"
+    />
   </div>
 </template>
 

@@ -208,4 +208,64 @@ public class ApiIntegrationTests : IClassFixture<CustomWebApplicationFactory>
         var prvAdminResp = await adminClient.GetAsync($"/api/clips/{prvId}");
         Assert.Equal(HttpStatusCode.OK, prvAdminResp.StatusCode);
     }
+
+    [Fact]
+    public async Task ClipTrim_Unauthenticated_ReturnsUnauthorized()
+    {
+        var anonClient = CreateAnonymousClient();
+        var response = await anonClient.PostAsJsonAsync("/api/clips/some-id/trim", new
+        {
+            startSeconds = 5.0,
+            endSeconds = 15.0
+        });
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task ClipTrim_ValidatesTimeInputs()
+    {
+        var (adminClient, _) = await CreateAdminClientAsync();
+        var clipId = "clip-trim-val-" + Guid.NewGuid().ToString("N")[..6];
+
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<DropDbContext>();
+            db.Clips.Add(new Clip
+            {
+                Id = clipId,
+                Title = "Source Video",
+                OriginalFileName = "src.mp4",
+                StoredFileName = $"{clipId}.mp4",
+                FileSizeBytes = 100,
+                DurationSeconds = 60.0,
+                Visibility = "public"
+            });
+            await db.SaveChangesAsync();
+        }
+
+        // 1. Negative start time
+        var negResp = await adminClient.PostAsJsonAsync($"/api/clips/{clipId}/trim", new
+        {
+            startSeconds = -2.0,
+            endSeconds = 10.0
+        });
+        Assert.Equal(HttpStatusCode.BadRequest, negResp.StatusCode);
+
+        // 2. End time <= start time
+        var endBeforeStartResp = await adminClient.PostAsJsonAsync($"/api/clips/{clipId}/trim", new
+        {
+            startSeconds = 15.0,
+            endSeconds = 10.0
+        });
+        Assert.Equal(HttpStatusCode.BadRequest, endBeforeStartResp.StatusCode);
+
+        // 3. Start time exceeding duration
+        var startExceedResp = await adminClient.PostAsJsonAsync($"/api/clips/{clipId}/trim", new
+        {
+            startSeconds = 65.0,
+            endSeconds = 70.0
+        });
+        Assert.Equal(HttpStatusCode.BadRequest, startExceedResp.StatusCode);
+    }
 }

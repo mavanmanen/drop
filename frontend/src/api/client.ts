@@ -166,6 +166,21 @@ class ApiClient {
     await this.request(`/clips/${id}`, { method: 'DELETE' });
   }
 
+  async trimClip(id: string, data: {
+    startSeconds: number;
+    endSeconds: number;
+    title?: string;
+    description?: string;
+    visibility?: string;
+    collectionId?: string;
+  }): Promise<Clip> {
+    return this.request<Clip>(`/clips/${id}/trim`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+  }
+
   async uploadClip(
     formData: FormData,
     onProgress?: (percent: number) => void
