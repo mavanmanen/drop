@@ -149,6 +149,12 @@ public static class DatabaseConfigurator
                 await db.Database.ExecuteSqlRawAsync("ALTER TABLE Clips ADD COLUMN ParentClipId TEXT NULL;");
             }
             catch { /* Column already exists */ }
+
+            try
+            {
+                await db.Database.ExecuteSqlRawAsync("ALTER TABLE Clips ADD COLUMN Tags TEXT NULL;");
+            }
+            catch { /* Column already exists */ }
         }
         else if (db.Database.IsNpgsql())
         {
@@ -167,6 +173,12 @@ public static class DatabaseConfigurator
             try
             {
                 await db.Database.ExecuteSqlRawAsync("ALTER TABLE \"Clips\" ADD COLUMN IF NOT EXISTS \"ParentClipId\" text NULL;");
+            }
+            catch { /* Column already exists */ }
+
+            try
+            {
+                await db.Database.ExecuteSqlRawAsync("ALTER TABLE \"Clips\" ADD COLUMN IF NOT EXISTS \"Tags\" text NULL;");
             }
             catch { /* Column already exists */ }
         }

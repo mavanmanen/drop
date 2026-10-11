@@ -24,9 +24,13 @@ import {
   Globe,
   Scissors,
   Film,
-  ArrowUpRight
+  ArrowUpRight,
+  Sparkles,
+  Tag
 } from '@lucide/vue';
 import TrimModal from '../components/TrimModal.vue';
+import AiAnalysisModal from '../components/AiAnalysisModal.vue';
+import type { AiSubClipSuggestion } from '../api/client';
 
 const route = useRoute();
 const router = useRouter();
@@ -38,9 +42,16 @@ const clip = ref<Clip | null>(null);
 const isLoading = ref(true);
 const isEditing = ref(false);
 const isTrimming = ref(false);
+const isAiAnalyzing = ref(false);
+const trimInitialStartTime = ref<number | undefined>(undefined);
+const trimInitialEndTime = ref<number | undefined>(undefined);
+const trimInitialTitle = ref<string | undefined>(undefined);
+const trimInitialDescription = ref<string | undefined>(undefined);
+
 const editTitle = ref('');
 const editDescription = ref('');
 const editVisibility = ref<'public' | 'unlisted' | 'private'>('public');
+const editTagsInput = ref('');
 const allCollections = ref<Collection[]>([]);
 const selectedNewColId = ref('');
 const isCopying = ref(false);
@@ -51,6 +62,29 @@ function onClipTrimmed(newClip: Clip) {
   router.push(`/clip/${newClip.id}`);
 }
 
+function openTrimWithSuggestion(suggestion: AiSubClipSuggestion) {
+  trimInitialStartTime.value = suggestion.startSeconds;
+  trimInitialEndTime.value = suggestion.endSeconds;
+  trimInitialTitle.value = suggestion.title;
+  trimInitialDescription.value = suggestion.description;
+  isTrimming.value = true;
+}
+
+function openNormalTrim() {
+  trimInitialStartTime.value = undefined;
+  trimInitialEndTime.value = undefined;
+  trimInitialTitle.value = undefined;
+  trimInitialDescription.value = undefined;
+  isTrimming.value = true;
+}
+
+function onTagsUpdated(newTags: string[]) {
+  if (clip.value) {
+    clip.value.tags = newTags;
+    editTagsInput.value = newTags.join(', ');
+  }
+}
+
 async function loadClip() {
   isLoading.value = true;
   try {
@@ -58,6 +92,7 @@ async function loadClip() {
     editTitle.value = clip.value.title;
     editDescription.value = clip.value.description || '';
     editVisibility.value = clip.value.visibility || 'public';
+    editTagsInput.value = (clip.value.tags || []).join(', ');
   } catch (err: any) {
     console.error('Failed to load clip', err);
     toastError('Clip not found');
@@ -93,10 +128,16 @@ async function copyShareLink() {
 async function saveEdit() {
   if (!clip.value || !editTitle.value.trim()) return;
   try {
+    const parsedTags = editTagsInput.value
+      .split(',')
+      .map(t => t.trim().replace(/^#+/, ''))
+      .filter(t => t.length > 0);
+
     const updated = await api.updateClip(clip.value.id, {
       title: editTitle.value.trim(),
       description: editDescription.value.trim() || null,
       visibility: editVisibility.value,
+      tags: parsedTags,
     });
     clip.value = updated;
     isEditing.value = false;
@@ -227,7 +268,11 @@ watch(
                 </span>
               </div>
               <div v-if="auth.isAuthenticated" class="admin-quick-actions">
-                <button class="btn btn-secondary btn-sm btn-trim" @click="isTrimming = true">
+                <button class="btn btn-primary btn-sm btn-ai-action" @click="isAiAnalyzing = true">
+                  <Sparkles :size="14" />
+                  <span>AI Analyse</span>
+                </button>
+                <button class="btn btn-secondary btn-sm btn-trim" @click="openNormalTrim">
                   <Scissors :size="14" />
                   <span>Cut Clip</span>
                 </button>
@@ -245,6 +290,18 @@ watch(
             <p v-if="clip.description" class="clip-description">
               {{ clip.description }}
             </p>
+
+            <!-- Tags List -->
+            <div v-if="clip.tags && clip.tags.length > 0" class="clip-tags-row">
+              <router-link
+                v-for="t in clip.tags"
+                :key="t"
+                :to="`/?tag=${encodeURIComponent(t)}`"
+                class="clip-tag-badge"
+              >
+                <span>#{{ t }}</span>
+              </router-link>
+            </div>
           </template>
 
           <template v-else>
@@ -257,6 +314,15 @@ watch(
               <div class="form-group">
                 <label>Description</label>
                 <textarea v-model="editDescription" rows="3" class="form-textarea"></textarea>
+              </div>
+              <div class="form-group">
+                <label>Tags (comma separated)</label>
+                <input
+                  v-model="editTagsInput"
+                  type="text"
+                  class="form-input"
+                  placeholder="e.g. apex, clutch, funny, sniper"
+                />
               </div>
               <div class="form-group">
                 <label>Visibility</label>
@@ -491,8 +557,22 @@ watch(
       :source-clip="clip"
       :all-collections="allCollections"
       :initial-current-time="playerRef?.currentTime ?? 0"
+      :initial-start-time="trimInitialStartTime"
+      :initial-end-time="trimInitialEndTime"
+      :initial-title="trimInitialTitle"
+      :initial-description="trimInitialDescription"
       @close="isTrimming = false"
       @trimmed="onClipTrimmed"
+    />
+
+    <!-- AI Analysis Modal (Admin only) -->
+    <AiAnalysisModal
+      v-if="clip && auth.isAuthenticated"
+      :show="isAiAnalyzing"
+      :clip="clip"
+      @close="isAiAnalyzing = false"
+      @tags-updated="onTagsUpdated"
+      @open-trim-with-suggestion="openTrimWithSuggestion"
     />
   </div>
 </template>
@@ -631,6 +711,49 @@ export default {
     line-height: 1.6;
     color: $text-secondary;
     white-space: pre-wrap;
+  }
+
+  .clip-tags-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    margin-top: -0.25rem;
+
+    .clip-tag-badge {
+      display: inline-flex;
+      align-items: center;
+      background: rgba(0, 242, 254, 0.08);
+      border: 1px solid rgba(0, 242, 254, 0.25);
+      color: $accent-cyan;
+      border-radius: 14px;
+      padding: 0.2rem 0.6rem;
+      font-size: 0.78rem;
+      font-weight: 600;
+      text-decoration: none;
+      transition: all $transition-fast;
+
+      &:hover {
+        background: rgba(0, 242, 254, 0.18);
+        border-color: $accent-cyan;
+        transform: translateY(-1px);
+      }
+    }
+  }
+
+  .btn-ai-action {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    background: linear-gradient(135deg, #00f2fe 0%, #4facfe 100%);
+    color: #050811;
+    font-weight: 700;
+    border: none;
+    box-shadow: 0 0 12px rgba(0, 242, 254, 0.35);
+
+    &:hover {
+      box-shadow: 0 0 18px rgba(0, 242, 254, 0.55);
+      transform: translateY(-1px);
+    }
   }
 
   .metrics-bar {

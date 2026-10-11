@@ -21,6 +21,10 @@ const props = defineProps<{
   sourceClip: Clip;
   allCollections: Collection[];
   initialCurrentTime?: number;
+  initialStartTime?: number;
+  initialEndTime?: number;
+  initialTitle?: string;
+  initialDescription?: string;
 }>();
 
 const emit = defineEmits<{
@@ -58,18 +62,23 @@ function initDefaults() {
   const sourceDuration = props.sourceClip.durationSeconds || 60;
   duration.value = sourceDuration;
 
-  const initial = props.initialCurrentTime !== undefined && props.initialCurrentTime < sourceDuration
-    ? Math.max(0, props.initialCurrentTime)
-    : 0;
+  if (props.initialStartTime !== undefined && props.initialEndTime !== undefined) {
+    startTime.value = Number(Math.max(0, props.initialStartTime).toFixed(1));
+    endTime.value = Number(Math.min(sourceDuration, Math.max(startTime.value + 0.2, props.initialEndTime)).toFixed(1));
+  } else {
+    const initial = props.initialCurrentTime !== undefined && props.initialCurrentTime < sourceDuration
+      ? Math.max(0, props.initialCurrentTime)
+      : 0;
 
-  startTime.value = Number(initial.toFixed(1));
-  endTime.value = Number(Math.min(sourceDuration, startTime.value + 15).toFixed(1));
-  if (endTime.value <= startTime.value) {
-    startTime.value = Math.max(0, endTime.value - 5);
+    startTime.value = Number(initial.toFixed(1));
+    endTime.value = Number(Math.min(sourceDuration, startTime.value + 15).toFixed(1));
+    if (endTime.value <= startTime.value) {
+      startTime.value = Math.max(0, endTime.value - 5);
+    }
   }
 
-  trimTitle.value = `${props.sourceClip.title} (Short)`;
-  trimDescription.value = props.sourceClip.description || '';
+  trimTitle.value = props.initialTitle?.trim() || `${props.sourceClip.title} (Short)`;
+  trimDescription.value = props.initialDescription !== undefined ? props.initialDescription : (props.sourceClip.description || '');
   trimVisibility.value = props.sourceClip.visibility || 'public';
   selectedCollectionId.value = '';
 }
