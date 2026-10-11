@@ -315,5 +315,18 @@ public class ApiIntegrationTests : IClassFixture<CustomWebApplicationFactory>
         Assert.True(parentResp.TryGetProperty("childClips", out var childrenArr));
         var childrenList = childrenArr.EnumerateArray().ToList();
         Assert.Contains(childrenList, c => c.GetProperty("id").GetString() == childId);
+
+        // Deleting the parent clip must NOT delete the child clip
+        var deleteParentResp = await adminClient.DeleteAsync($"/api/clips/{parentId}");
+        Assert.Equal(HttpStatusCode.OK, deleteParentResp.StatusCode);
+
+        // Child clip still exists and can be retrieved
+        var childAfterDeleteResp = await adminClient.GetAsync($"/api/clips/{childId}");
+        Assert.Equal(HttpStatusCode.OK, childAfterDeleteResp.StatusCode);
+
+        // Parent clip reference on child is now null
+        var childAfterDeleteJson = await childAfterDeleteResp.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.True(childAfterDeleteJson.TryGetProperty("parentClip", out var parentAfterDelete));
+        Assert.Equal(JsonValueKind.Null, parentAfterDelete.ValueKind);
     }
 }
