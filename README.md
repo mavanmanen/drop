@@ -42,7 +42,7 @@ Built with **.NET Core 10 Minimal APIs**, **Entity Framework Core (SQLite)**, an
 
 ## 🚀 Quick Start with Docker
 
-### 1. Run with Docker Compose
+### 1. Run with Docker Compose (Local Build)
 
 Clone the repository and run:
 
@@ -50,12 +50,19 @@ Clone the repository and run:
 docker compose up -d --build
 ```
 
-The application will be accessible at:
-```
-http://localhost:5000
+The application will be accessible at `http://localhost:5000`.
+
+### 2. Production Deployment (Prebuilt Image)
+
+To deploy on a remote server or NAS using the published image from GitHub Container Registry (without needing source code or compilers):
+
+```bash
+# 1. Download docker-compose.prod.yml
+# 2. Update the image name and your secrets, then run:
+docker compose -f docker-compose.prod.yml up -d
 ```
 
-### 2. Configure Environment Variables
+### 3. Configure Environment Variables
 
 Edit `docker-compose.yml` or create an `.env` file to customize:
 

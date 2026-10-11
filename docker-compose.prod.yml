@@ -1,0 +1,51 @@
+# ==============================================================================
+# Production Docker Compose for Drop (Gaming Clip Sharing Platform)
+#
+# Usage:
+#   1. Replace ghcr.io/<owner>/drop:latest with your image tag (or username)
+#   2. Set a strong DROP_ADMIN_PASSWORD and DROP_JWT_SECRET
+#   3. Run: docker compose -f docker-compose.prod.yml up -d
+# ==============================================================================
+
+services:
+  drop:
+    # Pre-built production container image from GitHub Container Registry (or Docker Hub)
+    image: ghcr.io/<owner>/drop:latest
+    container_name: drop-app
+    restart: unless-stopped
+    ports:
+      # Host:Container port mapping (8080 is internal ASP.NET Core port)
+      - "5000:8080"
+    environment:
+      # Single administrator account credentials
+      - DROP_ADMIN_USERNAME=admin
+      - DROP_ADMIN_PASSWORD=change-me-to-a-secure-password
+
+      # JWT Secret key: Must be at least 32 characters for production security
+      - DROP_JWT_SECRET=replace-with-a-random-32-char-secret-string
+
+      # Internal container storage paths
+      - DROP_DATA_DIR=/data
+      - DROP_INGEST_PATH=/data/ingest
+      - DROP_STORAGE_PATH=/data/clips
+      - DROP_DB_PATH=/data/db/drop.db
+
+      # Default visibility for automatically ingested clips: 'public', 'unlisted', or 'private'
+      - DROP_INGEST_DEFAULT_VISIBILITY=public
+
+    volumes:
+      # Ingest folder: Drop gaming clips here (OBS, Medal.tv, ShadowPlay) to auto-import
+      - ./data/ingest:/data/ingest
+      # Permanent video file storage
+      - ./data/clips:/data/clips
+      # Generated video thumbnails
+      - ./data/thumbnails:/data/thumbnails
+      # SQLite database storage directory (./data/db/drop.db)
+      - ./data/db:/data/db
+
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/health || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
