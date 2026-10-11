@@ -35,11 +35,17 @@ builder.Services.Configure<FormOptions>(options =>
 // Configure Database (SQLite or PostgreSQL)
 DatabaseConfigurator.ConfigureDatabase(builder.Services, builder.Configuration, builder.Environment);
 
+// Configure JSON serialization source generation
+builder.Services.ConfigureHttpJsonOptions(options =>
+{
+    options.SerializerOptions.TypeInfoResolverChain.Insert(0, Drop.Api.AppJsonSerializerContext.Default);
+});
+
 // Register Application Services
 builder.Services.AddHealthChecks();
 builder.Services.AddSingleton<IAuthService, AuthService>();
 builder.Services.AddSingleton<IMediaStorageService, MediaStorageService>();
-builder.Services.AddSingleton<IGeminiAnalysisService, GeminiAnalysisService>();
+builder.Services.AddHttpClient<IGeminiAnalysisService, GeminiAnalysisService>();
 builder.Services.AddHostedService<IngestWatcherService>();
 
 // Configure Authentication

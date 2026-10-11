@@ -60,7 +60,7 @@ services:
       # SQLite database file
       - ./data/db:/data/db
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:8080/health || exit 1"]
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:8080/health || exit 1"]
       interval: 30s
       timeout: 5s
       retries: 3

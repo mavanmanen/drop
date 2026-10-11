@@ -1,12 +1,78 @@
+using System.Net.Http.Headers;
+using System.Text;
 using System.Text.Json;
-using System.Text.Json.Nodes;
-using Google.GenAI;
-using Google.GenAI.Types;
 
 namespace Drop.Api.Services;
 
+#region Gemini REST DTOs
+public class GeminiFileRef
+{
+    public string? Name { get; set; }
+    public string? DisplayName { get; set; }
+    public string? MimeType { get; set; }
+    public string? SizeBytes { get; set; }
+    public string? CreateTime { get; set; }
+    public string? UpdateTime { get; set; }
+    public string? ExpirationTime { get; set; }
+    public string? Sha256Hash { get; set; }
+    public string? Uri { get; set; }
+    public string? State { get; set; } // "PROCESSING", "ACTIVE", "FAILED"
+}
+
+public class GeminiUploadFileResponse
+{
+    public GeminiFileRef? File { get; set; }
+}
+
+public class GeminiFileStatusResponse : GeminiFileRef
+{
+}
+
+public class GeminiGenerateContentRequest
+{
+    public List<GeminiContent>? Contents { get; set; }
+    public GeminiGenerationConfig? GenerationConfig { get; set; }
+}
+
+public class GeminiContent
+{
+    public string? Role { get; set; }
+    public List<GeminiPart>? Parts { get; set; }
+}
+
+public class GeminiPart
+{
+    public string? Text { get; set; }
+    public GeminiFileData? FileData { get; set; }
+}
+
+public class GeminiFileData
+{
+    public string? MimeType { get; set; }
+    public string? FileUri { get; set; }
+}
+
+public class GeminiGenerationConfig
+{
+    public string? ResponseMimeType { get; set; }
+    public float? Temperature { get; set; }
+}
+
+public class GeminiGenerateContentResponse
+{
+    public List<GeminiCandidate>? Candidates { get; set; }
+}
+
+public class GeminiCandidate
+{
+    public GeminiContent? Content { get; set; }
+    public string? FinishReason { get; set; }
+}
+#endregion
+
 public class GeminiAnalysisService : IGeminiAnalysisService
 {
+    private readonly HttpClient _httpClient;
     private readonly ILogger<GeminiAnalysisService> _logger;
     private readonly string? _apiKey;
     private readonly string _defaultModel;
@@ -22,12 +88,16 @@ public class GeminiAnalysisService : IGeminiAnalysisService
     public bool IsConfigured => !string.IsNullOrWhiteSpace(_apiKey);
     public IReadOnlyList<string> AvailableModels => SupportedModels;
 
-    public GeminiAnalysisService(IConfiguration configuration, ILogger<GeminiAnalysisService> logger)
+    public GeminiAnalysisService(
+        HttpClient httpClient,
+        IConfiguration configuration,
+        ILogger<GeminiAnalysisService> logger)
     {
+        _httpClient = httpClient;
         _logger = logger;
         _apiKey = configuration["GEMINI_API_KEY"]
                   ?? configuration["DROP_GEMINI_API_KEY"]
-                  ?? System.Environment.GetEnvironmentVariable("GEMINI_API_KEY");
+                  ?? Environment.GetEnvironmentVariable("GEMINI_API_KEY");
         _defaultModel = configuration["GEMINI_MODEL"] ?? "gemini-3.8-flash";
 
         if (!IsConfigured)
@@ -55,12 +125,10 @@ public class GeminiAnalysisService : IGeminiAnalysisService
 
         var targetModel = !string.IsNullOrWhiteSpace(model) ? model.Trim() : _defaultModel;
 
-        if (!System.IO.File.Exists(videoFilePath))
+        if (!File.Exists(videoFilePath))
         {
             throw new FileNotFoundException($"Video file not found at '{videoFilePath}'.");
         }
-
-        var client = new Client(apiKey: _apiKey);
 
         var mode = promptMode.Trim().ToLowerInvariant();
         if (mode is not "tags" and not "subclips" and not "both")
@@ -68,22 +136,16 @@ public class GeminiAnalysisService : IGeminiAnalysisService
             mode = "both";
         }
 
-        Google.GenAI.Types.File? uploadedFile = null;
+        GeminiFileRef? uploadedFile = null;
 
         try
         {
             _logger.LogInformation("Uploading video '{File}' to Gemini Files API...", Path.GetFileName(videoFilePath));
-            uploadedFile = await client.Files.UploadAsync(
-                filePath: videoFilePath,
-                config: new UploadFileConfig
-                {
-                    MimeType = mimeType,
-                    DisplayName = Path.GetFileName(videoFilePath)
-                }
-            );
+            uploadedFile = await UploadVideoFileAsync(videoFilePath, mimeType, cancellationToken);
 
-            // Wait for file processing if necessary
             var fileName = uploadedFile.Name ?? throw new InvalidOperationException("Gemini upload failed to return a file name.");
+
+            // Poll for processing completion
             var pollInterval = TimeSpan.FromSeconds(2);
             var maxAttempts = 30;
             var attempts = 0;
@@ -91,18 +153,18 @@ public class GeminiAnalysisService : IGeminiAnalysisService
             while (attempts < maxAttempts)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                var fileState = await client.Files.GetAsync(name: fileName);
-                if (fileState.State == FileState.Active)
+                var status = await GetFileStatusAsync(fileName, cancellationToken);
+                if (string.Equals(status.State, "ACTIVE", StringComparison.OrdinalIgnoreCase))
                 {
-                    uploadedFile = fileState;
+                    uploadedFile = status;
                     break;
                 }
-                if (fileState.State == FileState.Failed)
+                if (string.Equals(status.State, "FAILED", StringComparison.OrdinalIgnoreCase))
                 {
                     throw new InvalidOperationException($"Gemini file processing failed for '{fileName}'.");
                 }
 
-                _logger.LogInformation("Waiting for Gemini video processing (State: {State})...", fileState.State);
+                _logger.LogInformation("Waiting for Gemini video processing (State: {State})...", status.State);
                 await Task.Delay(pollInterval, cancellationToken);
                 attempts++;
             }
@@ -110,69 +172,7 @@ public class GeminiAnalysisService : IGeminiAnalysisService
             var promptText = BuildPrompt(mode, durationSeconds);
             _logger.LogInformation("Sending video analysis request to Gemini model {Model} (mode: {Mode})...", targetModel, mode);
 
-            var schemaString = """
-            {
-              "type": "object",
-              "properties": {
-                "tags": {
-                  "type": "array",
-                  "items": { "type": "string" },
-                  "description": "Short relevant gaming tags (game title, clutch, funny, ace, weapon, hero, map, etc.)"
-                },
-                "subClips": {
-                  "type": "array",
-                  "items": {
-                    "type": "object",
-                    "properties": {
-                      "title": { "type": "string", "description": "Concise exciting title for the highlight moment" },
-                      "description": { "type": "string", "description": "Brief description of the action" },
-                      "startSeconds": { "type": "number", "description": "Start timestamp in seconds" },
-                      "endSeconds": { "type": "number", "description": "End timestamp in seconds" }
-                    },
-                    "required": ["title", "startSeconds", "endSeconds"]
-                  },
-                  "description": "Suggested sub-clip highlights cut from this video"
-                },
-                "summary": {
-                  "type": "string",
-                  "description": "Brief summary of what happened in the clip"
-                }
-              },
-              "required": ["tags", "subClips"]
-            }
-            """;
-
-            var config = new GenerateContentConfig
-            {
-                ResponseMimeType = "application/json",
-                ResponseJsonSchema = JsonNode.Parse(schemaString),
-                Temperature = 0.2f
-            };
-
-            var contentParts = new List<Part>
-            {
-                new Part
-                {
-                    FileData = new FileData
-                    {
-                        FileUri = uploadedFile.Uri,
-                        MimeType = uploadedFile.MimeType
-                    }
-                },
-                new Part { Text = promptText }
-            };
-
-            var response = await client.Models.GenerateContentAsync(
-                model: targetModel,
-                contents: new Content { Parts = contentParts },
-                config: config
-            );
-
-            var rawJson = response.Candidates?[0]?.Content?.Parts?[0]?.Text;
-            if (string.IsNullOrWhiteSpace(rawJson))
-            {
-                throw new InvalidOperationException("Gemini returned an empty response.");
-            }
+            var rawJson = await GenerateContentAsync(targetModel, uploadedFile.Uri!, uploadedFile.MimeType ?? mimeType, promptText, cancellationToken);
 
             return ParseResult(rawJson, durationSeconds, mode);
         }
@@ -183,7 +183,7 @@ public class GeminiAnalysisService : IGeminiAnalysisService
                 try
                 {
                     _logger.LogInformation("Cleaning up uploaded file '{File}' from Gemini Files API...", uploadedFile.Name);
-                    await client.Files.DeleteAsync(name: uploadedFile.Name);
+                    await DeleteFileAsync(uploadedFile.Name, CancellationToken.None);
                 }
                 catch (Exception ex)
                 {
@@ -191,6 +191,135 @@ public class GeminiAnalysisService : IGeminiAnalysisService
                 }
             }
         }
+    }
+
+    private async Task<GeminiFileRef> UploadVideoFileAsync(string filePath, string mimeType, CancellationToken ct)
+    {
+        // 1. Resumable / Initial upload request to https://generativelanguage.googleapis.com/upload/v1beta/files
+        var uploadUri = $"https://generativelanguage.googleapis.com/upload/v1beta/files?key={_apiKey}";
+        var fileInfo = new FileInfo(filePath);
+        var fileName = Path.GetFileName(filePath);
+
+        using var initReq = new HttpRequestMessage(HttpMethod.Post, uploadUri);
+        initReq.Headers.Add("X-Goog-Upload-Protocol", "resumable");
+        initReq.Headers.Add("X-Goog-Upload-Command", "start");
+        initReq.Headers.Add("X-Goog-Upload-Header-Content-Length", fileInfo.Length.ToString());
+        initReq.Headers.Add("X-Goog-Upload-Header-Content-Type", mimeType);
+
+        var metadataJson = $"{{\"file\": {{\"display_name\": {JsonSerializer.Serialize(fileName)}}}}}";
+        initReq.Content = new StringContent(metadataJson, Encoding.UTF8, "application/json");
+
+        using var initResp = await _httpClient.SendAsync(initReq, ct);
+        initResp.EnsureSuccessStatusCode();
+
+        if (!initResp.Headers.TryGetValues("X-Goog-Upload-URL", out var uploadUrlValues))
+        {
+            throw new InvalidOperationException("Gemini Files API upload did not return an upload URL.");
+        }
+
+        var resumableUrl = uploadUrlValues.First();
+
+        // 2. Upload file bytes
+        await using var fileStream = File.OpenRead(filePath);
+        using var chunkReq = new HttpRequestMessage(HttpMethod.Post, resumableUrl);
+        chunkReq.Headers.Add("X-Goog-Upload-Offset", "0");
+        chunkReq.Headers.Add("X-Goog-Upload-Command", "upload, finalize");
+        chunkReq.Content = new StreamContent(fileStream);
+        chunkReq.Content.Headers.ContentType = new MediaTypeHeaderValue(mimeType);
+        chunkReq.Content.Headers.ContentLength = fileInfo.Length;
+
+        using var chunkResp = await _httpClient.SendAsync(chunkReq, ct);
+        chunkResp.EnsureSuccessStatusCode();
+
+        var respStream = await chunkResp.Content.ReadAsStreamAsync(ct);
+        var uploadResult = await JsonSerializer.DeserializeAsync(
+            respStream,
+            AppJsonSerializerContext.Default.GeminiUploadFileResponse,
+            ct);
+
+        return uploadResult?.File ?? throw new InvalidOperationException("Failed to parse Gemini upload response.");
+    }
+
+    private async Task<GeminiFileStatusResponse> GetFileStatusAsync(string fileName, CancellationToken ct)
+    {
+        var url = $"https://generativelanguage.googleapis.com/v1beta/{fileName}?key={_apiKey}";
+        using var resp = await _httpClient.GetAsync(url, ct);
+        resp.EnsureSuccessStatusCode();
+
+        await using var stream = await resp.Content.ReadAsStreamAsync(ct);
+        var status = await JsonSerializer.DeserializeAsync(
+            stream,
+            AppJsonSerializerContext.Default.GeminiFileStatusResponse,
+            ct);
+
+        return status ?? throw new InvalidOperationException($"Failed to deserialize status for file '{fileName}'.");
+    }
+
+    private async Task<string> GenerateContentAsync(
+        string model,
+        string fileUri,
+        string mimeType,
+        string promptText,
+        CancellationToken ct)
+    {
+        var url = $"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={_apiKey}";
+
+        var requestBody = new GeminiGenerateContentRequest
+        {
+            Contents =
+            [
+                new GeminiContent
+                {
+                    Parts =
+                    [
+                        new GeminiPart
+                        {
+                            FileData = new GeminiFileData
+                            {
+                                FileUri = fileUri,
+                                MimeType = mimeType
+                            }
+                        },
+                        new GeminiPart { Text = promptText }
+                    ]
+                }
+            ],
+            GenerationConfig = new GeminiGenerationConfig
+            {
+                ResponseMimeType = "application/json",
+                Temperature = 0.2f
+            }
+        };
+
+        var jsonString = JsonSerializer.Serialize(requestBody, AppJsonSerializerContext.Default.GeminiGenerateContentRequest);
+        using var postReq = new HttpRequestMessage(HttpMethod.Post, url)
+        {
+            Content = new StringContent(jsonString, Encoding.UTF8, "application/json")
+        };
+
+        using var response = await _httpClient.SendAsync(postReq, ct);
+        response.EnsureSuccessStatusCode();
+
+        await using var stream = await response.Content.ReadAsStreamAsync(ct);
+        var genResult = await JsonSerializer.DeserializeAsync(
+            stream,
+            AppJsonSerializerContext.Default.GeminiGenerateContentResponse,
+            ct);
+
+        var rawJson = genResult?.Candidates?.FirstOrDefault()?.Content?.Parts?.FirstOrDefault()?.Text;
+        if (string.IsNullOrWhiteSpace(rawJson))
+        {
+            throw new InvalidOperationException("Gemini returned an empty response.");
+        }
+
+        return rawJson;
+    }
+
+    private async Task DeleteFileAsync(string fileName, CancellationToken ct)
+    {
+        var url = $"https://generativelanguage.googleapis.com/v1beta/{fileName}?key={_apiKey}";
+        using var resp = await _httpClient.DeleteAsync(url, ct);
+        // Best-effort cleanup
     }
 
     private static string BuildPrompt(string mode, double? durationSeconds)
@@ -203,19 +332,39 @@ public class GeminiAnalysisService : IGeminiAnalysisService
         {
             "tags" => $@"Analyze this video game recording. {durationInfo}
 Task: Generate between 3 to 8 concise, relevant gaming tags that describe the game title, gameplay moments (e.g. clutch, ace, fail, snipe, win), hero/agent/weapon, or game mode.
-Leave subClips as an empty array.",
+Format your output as a valid JSON object matching:
+{{
+  ""tags"": [""tag1"", ""tag2""],
+  ""subClips"": [],
+  ""summary"": ""brief summary""
+}}",
 
             "subclips" => $@"Analyze this video game recording. {durationInfo}
 Task: Identify the most exciting, funny, or noteworthy highlight moments and suggest short sub-clips to cut from it.
 Each suggested sub-clip must have an exciting title, brief description, startSeconds, and endSeconds strictly within the video duration boundaries.
 Keep cut moments focused (typically between 5 and 30 seconds long).
-Leave tags as an empty array.",
+Format your output as a valid JSON object matching:
+{{
+  ""tags"": [],
+  ""subClips"": [
+    {{ ""title"": ""Highlight"", ""description"": ""description"", ""startSeconds"": 1.0, ""endSeconds"": 15.0 }}
+  ],
+  ""summary"": ""brief summary""
+}}",
 
             _ => $@"Analyze this video game recording. {durationInfo}
 Task:
 1. Generate between 3 to 8 concise, relevant gaming tags (game title, moment type like clutch/funny/ace, character/weapon).
 2. Identify the most exciting or noteworthy highlight moments and suggest short sub-clips to cut from it with accurate startSeconds and endSeconds.
-3. Provide a one-sentence summary of the clip."
+3. Provide a one-sentence summary of the clip.
+Format your output as a valid JSON object matching:
+{{
+  ""tags"": [""tag1"", ""tag2""],
+  ""subClips"": [
+    {{ ""title"": ""Highlight"", ""description"": ""description"", ""startSeconds"": 1.0, ""endSeconds"": 15.0 }}
+  ],
+  ""summary"": ""brief summary""
+}}"
         };
     }
 
