@@ -13,7 +13,7 @@ RUN npm run build
 # ==========================================
 # Stage 2: Build .NET 10 Minimal API Backend
 # ==========================================
-FROM mcr.microsoft.com/dotnet/sdk:10.0 AS backend-builder
+FROM mcr.microsoft.com/dotnet/sdk:10.0-alpine AS backend-builder
 WORKDIR /src/backend
 
 COPY backend/Drop.Api/*.csproj ./Drop.Api/
@@ -30,13 +30,11 @@ RUN dotnet publish -c Release -o /app/publish /p:UseAppHost=false
 # ==========================================
 # Stage 3: Final Runtime Container
 # ==========================================
-FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
+FROM mcr.microsoft.com/dotnet/aspnet:10.0-alpine AS runtime
 WORKDIR /app
 
 # Install ffmpeg for automatic clip thumbnail generation & duration probing, and curl for healthchecks
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends ffmpeg curl && \
-    rm -rf /var/lib/apt/lists/*
+RUN apk add --no-cache ffmpeg curl
 
 # Create persistent data directories
 RUN mkdir -p /data/ingest /data/clips /data/thumbnails /data/db
