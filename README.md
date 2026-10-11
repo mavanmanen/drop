@@ -113,10 +113,24 @@ npm run dev
 ```
 Frontend runs on `http://localhost:5173` with automatic API proxying to `http://localhost:5000`.
 
-### 3. Run Backend Unit & Integration Tests
+### 3. Run Automated Tests
 
+**Backend Tests (Unit & API Integration):**
 ```bash
 dotnet test
+```
+
+**Frontend Automated UI Tests (Vitest & Vue Test Utils):**
+```bash
+cd frontend
+npm test
+```
+
+**Frontend E2E Browser Tests (Playwright):**
+```bash
+cd frontend
+npx playwright install # First time only to download headless browsers
+npm run test:e2e
 ```
 
 ### 4. Build Full Single-Binary Package
