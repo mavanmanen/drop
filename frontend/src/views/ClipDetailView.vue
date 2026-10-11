@@ -672,7 +672,15 @@ export default {
 
     .admin-quick-actions {
       display: flex;
+      flex-wrap: wrap;
+      align-items: center;
       gap: 0.5rem;
+      flex-shrink: 0;
+
+      .btn {
+        white-space: nowrap;
+        flex-shrink: 0;
+      }
     }
   }
 
