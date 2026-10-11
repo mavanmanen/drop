@@ -109,4 +109,18 @@ describe('TrimModal.vue', () => {
     await wrapper.find('.btn-close').trigger('click');
     expect(wrapper.emitted('close')).toBeTruthy();
   });
+
+  it('renders start and end slider handles on the timeline track', () => {
+    const wrapper = mount(TrimModal, {
+      props: {
+        show: true,
+        sourceClip: dummyClip,
+        allCollections: [],
+      },
+    });
+
+    expect(wrapper.find('.trim-handle-start').exists()).toBe(true);
+    expect(wrapper.find('.trim-handle-end').exists()).toBe(true);
+    expect(wrapper.find('.timeline-active-slice').exists()).toBe(true);
+  });
 });
