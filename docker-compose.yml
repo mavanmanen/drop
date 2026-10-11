@@ -7,31 +7,46 @@ services:
     container_name: drop-app
     restart: unless-stopped
     ports:
-      - "5000:8080"
+      - "${DROP_PORT:-5000}:8080"
+    env_file:
+      - path: .env
+        required: false
     environment:
       # Single admin account configuration
-      - DROP_ADMIN_USERNAME=admin
-      - DROP_ADMIN_PASSWORD=change-me-promptly
+      - DROP_ADMIN_USERNAME=${DROP_ADMIN_USERNAME:-admin}
+      - DROP_ADMIN_PASSWORD=${DROP_ADMIN_PASSWORD:-change-me-promptly}
       # Optional custom JWT secret (recommended for production)
-      - DROP_JWT_SECRET=replace-with-a-random-32-char-secret-string
+      - DROP_JWT_SECRET=${DROP_JWT_SECRET:-drop_super_secret_gaming_clips_key_2026_dev_env_only!}
       # Storage and directory paths inside container
-      - DROP_DATA_DIR=/data
-      - DROP_INGEST_PATH=/data/ingest
-      - DROP_STORAGE_PATH=/data/clips
+      - DROP_DATA_DIR=${DROP_DATA_DIR:-/data}
+      - DROP_INGEST_PATH=${DROP_INGEST_PATH:-/data/ingest}
+      - DROP_STORAGE_PATH=${DROP_STORAGE_PATH:-/data/clips}
       # Database configuration: 'sqlite' (default) or 'postgres'
-      - DROP_DB_PROVIDER=sqlite
-      - DROP_DB_PATH=/data/db/drop.db
-      # If using postgres, set:
-      # - DROP_DB_PROVIDER=postgres
-      # - DROP_POSTGRES_HOST=postgres
-      # - DROP_POSTGRES_PORT=5432
-      # - DROP_POSTGRES_DB=drop
-      # - DROP_POSTGRES_USER=drop
-      # - DROP_POSTGRES_PASSWORD=your-postgres-password
-      # Or:
-      # - DROP_DB_CONNECTION_STRING=Host=postgres;Port=5432;Database=drop;Username=drop;Password=secret
+      - DROP_DB_PROVIDER=${DROP_DB_PROVIDER:-sqlite}
+      - DROP_DB_PATH=${DROP_DB_PATH:-/data/db/drop.db}
       # Default visibility for automatically ingested clips (public, unlisted, or private)
-      - DROP_INGEST_DEFAULT_VISIBILITY=public
+      - DROP_INGEST_DEFAULT_VISIBILITY=${DROP_INGEST_DEFAULT_VISIBILITY:-public}
+    develop:
+      watch:
+        # Rebuild container when backend source code or project file changes
+        - action: rebuild
+          path: ./backend/Drop.Api
+          ignore:
+            - bin/
+            - obj/
+            - wwwroot/
+        # Rebuild container when frontend dependencies or config changes
+        - action: rebuild
+          path: ./frontend/package.json
+        # Sync frontend source code and rebuild
+        - action: rebuild
+          path: ./frontend/src
+        # Sync frontend public assets
+        - action: rebuild
+          path: ./frontend/public
+        # Rebuild when Dockerfile changes
+        - action: rebuild
+          path: ./Dockerfile
     volumes:
       # Ingest folder: Drop your gaming recordings/clips here to auto-import!
       - ./data/ingest:/data/ingest

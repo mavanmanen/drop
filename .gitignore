@@ -28,3 +28,9 @@ desktop.ini
 # IDEs
 .vscode/
 .idea/
+
+# Environment variable files
+.env
+.env.*
+!.env.example
+!.env.*.example
