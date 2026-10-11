@@ -85,11 +85,9 @@ public static class ClipEndpoints
         if (string.IsNullOrWhiteSpace(json)) return null;
         try
         {
-            var options = new System.Text.Json.JsonSerializerOptions
-            {
-                PropertyNameCaseInsensitive = true
-            };
-            return System.Text.Json.JsonSerializer.Deserialize<AiClipAnalysisResult>(json, options);
+            return System.Text.Json.JsonSerializer.Deserialize(
+                json,
+                AppJsonSerializerContext.Default.AiClipAnalysisResult);
         }
         catch
         {
