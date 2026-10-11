@@ -408,4 +408,67 @@ public class ApiIntegrationTests : IClassFixture<CustomWebApplicationFactory>
         Assert.Equal("Great clutch moment", latestAi.GetProperty("summary").GetString());
         Assert.Equal("Headshot", latestAi.GetProperty("subClips")[0].GetProperty("title").GetString());
     }
+
+    [Fact]
+    public async Task Clip_OpenGraphBotEndpoints_ReturnVideoEmbedMetaTags()
+    {
+        var clipId = "og-test-" + Guid.NewGuid().ToString("N")[..6];
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<DropDbContext>();
+            db.Clips.Add(new Clip
+            {
+                Id = clipId,
+                Title = "Discord Embed Victory",
+                Description = "Watch this epic play",
+                OriginalFileName = "victory.mp4",
+                StoredFileName = $"{clipId}.mp4",
+                FileSizeBytes = 5000,
+                DurationSeconds = 25.0,
+                Visibility = "public"
+            });
+            await db.SaveChangesAsync();
+        }
+
+        var anonClient = CreateAnonymousClient();
+
+        // 1. Request to /clip/{id} with Discordbot User-Agent
+        var discordReq = new HttpRequestMessage(HttpMethod.Get, $"/clip/{clipId}");
+        discordReq.Headers.UserAgent.ParseAdd("Mozilla/5.0 (compatible; Discordbot/2.0; +https://discord.app)");
+        discordReq.Headers.Add("X-Forwarded-Proto", "https");
+        discordReq.Headers.Add("X-Forwarded-Host", "drop.mavm.nl");
+
+        var discordResp = await anonClient.SendAsync(discordReq);
+        Assert.Equal(HttpStatusCode.OK, discordResp.StatusCode);
+        var html = await discordResp.Content.ReadAsStringAsync();
+
+        Assert.Contains("<meta property=\"og:type\" content=\"video.other\">", html);
+        Assert.Contains("<meta property=\"og:title\" content=\"Discord Embed Victory\">", html);
+        Assert.Contains("<meta property=\"og:video\" content=\"https://drop.mavm.nl/api/clips/" + clipId + "/stream\">", html);
+        Assert.Contains("<meta property=\"og:video:secure_url\" content=\"https://drop.mavm.nl/api/clips/" + clipId + "/stream\">", html);
+        Assert.Contains("<meta property=\"og:image\" content=\"https://drop.mavm.nl/api/clips/" + clipId + "/thumbnail\">", html);
+        Assert.Contains("<meta name=\"twitter:card\" content=\"player\">", html);
+
+        // 2. Request to /c/{id} with Discordbot User-Agent
+        var shortReq = new HttpRequestMessage(HttpMethod.Get, $"/c/{clipId}");
+        shortReq.Headers.UserAgent.ParseAdd("Mozilla/5.0 (compatible; Discordbot/2.0; +https://discord.app)");
+        shortReq.Headers.Add("X-Forwarded-Proto", "https");
+        shortReq.Headers.Add("X-Forwarded-Host", "drop.mavm.nl");
+
+        var shortResp = await anonClient.SendAsync(shortReq);
+        Assert.Equal(HttpStatusCode.OK, shortResp.StatusCode);
+        var shortHtml = await shortResp.Content.ReadAsStringAsync();
+        Assert.Contains("<meta property=\"og:video\" content=\"https://drop.mavm.nl/api/clips/" + clipId + "/stream\">", shortHtml);
+
+        // 3. Request to /c/{id} as regular browser user -> 302 Redirect to /clip/{id}
+        var noRedirectClient = _factory.CreateClient(new WebApplicationFactoryClientOptions
+        {
+            AllowAutoRedirect = false
+        });
+        var browserReq = new HttpRequestMessage(HttpMethod.Get, $"/c/{clipId}");
+        browserReq.Headers.UserAgent.ParseAdd("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/130.0.0.0");
+        var browserResp = await noRedirectClient.SendAsync(browserReq);
+        Assert.Equal(HttpStatusCode.Redirect, browserResp.StatusCode);
+        Assert.Equal($"/clip/{clipId}", browserResp.Headers.Location?.ToString());
+    }
 }

@@ -415,7 +415,7 @@ watch(
             </button>
           </div>
 
-          <a :href="clip.videoUrl" download class="btn btn-secondary btn-download">
+          <a :href="`${clip.videoUrl}?download=1`" download class="btn btn-secondary btn-download">
             <Download :size="15" />
             <span>Download Original Video</span>
           </a>
