@@ -167,7 +167,7 @@ static IResult GenerateOpenGraphHtml(Clip clip, HttpContext context)
     // Determine canonical scheme and host (respecting X-Forwarded-Proto / X-Forwarded-Host)
     var scheme = context.Request.Scheme;
     var host = context.Request.Host.Value;
-    var streamUrl = $"{scheme}://{host}/api/clips/{clip.Id}/stream";
+    var streamUrl = $"{scheme}://{host}/api/clips/{clip.Id}/stream.mp4";
     var thumbUrl = $"{scheme}://{host}/api/clips/{clip.Id}/thumbnail";
     var pageUrl = $"{scheme}://{host}/clip/{clip.Id}";
 

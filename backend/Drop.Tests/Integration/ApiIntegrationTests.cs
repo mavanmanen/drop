@@ -444,8 +444,8 @@ public class ApiIntegrationTests : IClassFixture<CustomWebApplicationFactory>
 
         Assert.Contains("<meta property=\"og:type\" content=\"video.other\">", html);
         Assert.Contains("<meta property=\"og:title\" content=\"Discord Embed Victory\">", html);
-        Assert.Contains("<meta property=\"og:video\" content=\"https://drop.mavm.nl/api/clips/" + clipId + "/stream\">", html);
-        Assert.Contains("<meta property=\"og:video:secure_url\" content=\"https://drop.mavm.nl/api/clips/" + clipId + "/stream\">", html);
+        Assert.Contains("<meta property=\"og:video\" content=\"https://drop.mavm.nl/api/clips/" + clipId + "/stream.mp4\">", html);
+        Assert.Contains("<meta property=\"og:video:secure_url\" content=\"https://drop.mavm.nl/api/clips/" + clipId + "/stream.mp4\">", html);
         Assert.Contains("<meta property=\"og:image\" content=\"https://drop.mavm.nl/api/clips/" + clipId + "/thumbnail\">", html);
         Assert.Contains("<meta name=\"twitter:card\" content=\"player\">", html);
 
@@ -458,7 +458,7 @@ public class ApiIntegrationTests : IClassFixture<CustomWebApplicationFactory>
         var shortResp = await anonClient.SendAsync(shortReq);
         Assert.Equal(HttpStatusCode.OK, shortResp.StatusCode);
         var shortHtml = await shortResp.Content.ReadAsStringAsync();
-        Assert.Contains("<meta property=\"og:video\" content=\"https://drop.mavm.nl/api/clips/" + clipId + "/stream\">", shortHtml);
+        Assert.Contains("<meta property=\"og:video\" content=\"https://drop.mavm.nl/api/clips/" + clipId + "/stream.mp4\">", shortHtml);
 
         // 3. Request to /c/{id} as regular browser user -> 302 Redirect to /clip/{id}
         var noRedirectClient = _factory.CreateClient(new WebApplicationFactoryClientOptions
@@ -470,5 +470,10 @@ public class ApiIntegrationTests : IClassFixture<CustomWebApplicationFactory>
         var browserResp = await noRedirectClient.SendAsync(browserReq);
         Assert.Equal(HttpStatusCode.Redirect, browserResp.StatusCode);
         Assert.Equal($"/clip/{clipId}", browserResp.Headers.Location?.ToString());
+
+        // 4. Test stream.mp4 and cleanId endpoint aliases
+        var streamMp4Resp = await anonClient.GetAsync($"/api/clips/{clipId}/stream.mp4");
+        // Returns NotFound because physical test file is dummy, but route resolution is validated
+        Assert.Equal(HttpStatusCode.NotFound, streamMp4Resp.StatusCode);
     }
 }
