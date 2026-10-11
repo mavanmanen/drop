@@ -49,6 +49,7 @@ html, body {
   font-weight: 600;
   font-size: 0.875rem;
   cursor: pointer;
+  white-space: nowrap;
   transition: all $transition-fast;
   border: 1px solid transparent;
   text-decoration: none;
