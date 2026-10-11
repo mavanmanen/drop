@@ -192,14 +192,19 @@ public static class ClipEndpoints
         });
 
         // Stream video: Private clips require admin
-        group.MapMethods("/{id}/stream", ["GET", "HEAD"], (
+        // Video stream: Available at /{id}/stream, /{id}/stream.mp4, and /{id}.mp4
+        var streamHandler = (
             string id,
             DropDbContext db,
             IMediaStorageService mediaStorage,
             IAuthService authService,
             HttpContext httpContext) =>
         {
-            var clip = db.Clips.AsNoTracking().FirstOrDefault(c => c.Id == id);
+            var cleanId = id.EndsWith(".mp4", StringComparison.OrdinalIgnoreCase)
+                ? id[..^4]
+                : id;
+
+            var clip = db.Clips.AsNoTracking().FirstOrDefault(c => c.Id == cleanId);
             if (clip == null) return Results.NotFound(new { error = "Clip not found" });
 
             if (clip.Visibility == "private" && !authService.IsAdmin(httpContext))
@@ -220,7 +225,11 @@ public static class ClipEndpoints
                 contentType: clip.ContentType,
                 fileDownloadName: download ? clip.OriginalFileName : null,
                 enableRangeProcessing: true);
-        });
+        };
+
+        group.MapMethods("/{id}/stream", ["GET", "HEAD"], streamHandler);
+        group.MapMethods("/{id}/stream.mp4", ["GET", "HEAD"], streamHandler);
+        group.MapMethods("/{id}.mp4", ["GET", "HEAD"], streamHandler);
 
         // Thumbnail: Private clips require admin
         group.MapMethods("/{id}/thumbnail", ["GET", "HEAD"], (

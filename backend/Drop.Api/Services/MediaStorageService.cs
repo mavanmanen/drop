@@ -114,6 +114,11 @@ public class MediaStorageService : IMediaStorageService
         var fileInfo = new FileInfo(destinationPath);
         var fileSize = fileInfo.Length;
 
+        // Ensure video is optimized for web streaming (moov atom placed at front for Discord and browser players)
+        destinationPath = await TryOptimizeForWebStreamingAsync(destinationPath);
+        fileInfo = new FileInfo(destinationPath);
+        fileSize = fileInfo.Length;
+
         var thumbnailFileName = await TryGenerateThumbnailAsync(destinationPath, clipId);
         var durationSeconds = await TryExtractDurationAsync(destinationPath);
 
@@ -134,6 +139,8 @@ public class MediaStorageService : IMediaStorageService
             await file.CopyToAsync(stream);
         }
 
+        // Ensure video is optimized for web streaming (moov atom placed at front for Discord and browser players)
+        destinationPath = await TryOptimizeForWebStreamingAsync(destinationPath);
         var fileInfo = new FileInfo(destinationPath);
         var fileSize = fileInfo.Length;
 
@@ -164,14 +171,14 @@ public class MediaStorageService : IMediaStorageService
         var startStr = startSeconds.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture);
         var durStr = duration.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture);
 
-        // First attempt fast stream copy (-c copy)
+        // First attempt fast stream copy (-c copy) with faststart
         bool success = false;
         try
         {
             var psi = new ProcessStartInfo
             {
                 FileName = "ffmpeg",
-                Arguments = $"-y -ss {startStr} -i \"{sourcePath}\" -t {durStr} -c copy \"{outputPath}\"",
+                Arguments = $"-y -ss {startStr} -i \"{sourcePath}\" -t {durStr} -c copy -movflags +faststart \"{outputPath}\"",
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
                 UseShellExecute = false,
@@ -195,7 +202,7 @@ public class MediaStorageService : IMediaStorageService
             _logger.LogWarning(ex, "FFmpeg fast copy trim failed for {Source}. Falling back to re-encode.", sourceStoredFileName);
         }
 
-        // If fast copy failed or produced an empty file, re-encode with standard H.264 / AAC
+        // If fast copy failed or produced an empty file, re-encode with standard H.264 / AAC and faststart
         if (!success)
         {
             try
@@ -203,7 +210,7 @@ public class MediaStorageService : IMediaStorageService
                 var psi = new ProcessStartInfo
                 {
                     FileName = "ffmpeg",
-                    Arguments = $"-y -ss {startStr} -i \"{sourcePath}\" -t {durStr} -c:v libx264 -preset fast -crf 22 -c:a aac -b:a 192k \"{outputPath}\"",
+                    Arguments = $"-y -ss {startStr} -i \"{sourcePath}\" -t {durStr} -c:v libx264 -preset fast -crf 22 -c:a aac -b:a 192k -movflags +faststart \"{outputPath}\"",
                     RedirectStandardOutput = true,
                     RedirectStandardError = true,
                     UseShellExecute = false,
@@ -330,5 +337,55 @@ public class MediaStorageService : IMediaStorageService
         }
 
         return null;
+    }
+
+    private async Task<string> TryOptimizeForWebStreamingAsync(string videoPath)
+    {
+        var ext = Path.GetExtension(videoPath).ToLowerInvariant();
+        if (ext != ".mp4" && ext != ".mov")
+        {
+            return videoPath;
+        }
+
+        var tempOptimizedPath = $"{videoPath}.faststart.tmp";
+        try
+        {
+            var psi = new ProcessStartInfo
+            {
+                FileName = "ffmpeg",
+                Arguments = $"-y -i \"{videoPath}\" -c copy -movflags +faststart \"{tempOptimizedPath}\"",
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+                CreateNoWindow = true
+            };
+
+            using var process = Process.Start(psi);
+            if (process != null)
+            {
+                var stderrTask = process.StandardError.ReadToEndAsync();
+                var stdoutTask = process.StandardOutput.ReadToEndAsync();
+                await Task.WhenAll(stderrTask, stdoutTask, process.WaitForExitAsync());
+
+                if (process.ExitCode == 0 && File.Exists(tempOptimizedPath) && new FileInfo(tempOptimizedPath).Length > 0)
+                {
+                    File.Move(tempOptimizedPath, videoPath, overwrite: true);
+                    _logger.LogInformation("Optimized {VideoPath} for web streaming (faststart moov atom moved to beginning).", videoPath);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to run faststart optimization for {VideoPath}. Keeping original file.", videoPath);
+        }
+        finally
+        {
+            if (File.Exists(tempOptimizedPath))
+            {
+                try { File.Delete(tempOptimizedPath); } catch { /* Ignore cleanup failure */ }
+            }
+        }
+
+        return videoPath;
     }
 }
