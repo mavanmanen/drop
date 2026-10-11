@@ -23,6 +23,8 @@ public class IngestWatcherServiceTests
             => Task.FromResult(("stored.mp4", (string?)"thumb.jpg", (double?)10.0, 1024L));
         public Task<(string storedFileName, string? thumbnailFileName, double? durationSeconds, long fileSize)> SaveUploadedVideoAsync(Microsoft.AspNetCore.Http.IFormFile file, string clipId)
             => Task.FromResult(("stored.mp4", (string?)"thumb.jpg", (double?)10.0, 1024L));
+        public Task<(string storedFileName, string? thumbnailFileName, double? durationSeconds, long fileSize)> TrimVideoAsync(string sourceStoredFileName, string newClipId, double startSeconds, double endSeconds)
+            => Task.FromResult(("trimmed.mp4", (string?)"thumb.jpg", (double?)(endSeconds - startSeconds), 512L));
     }
 
     [Theory]

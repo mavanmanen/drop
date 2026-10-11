@@ -105,6 +105,13 @@ public class MediaStorageServiceTests : IDisposable
         Assert.Equal(thumbPath, path);
     }
 
+    [Fact]
+    public async Task TrimVideoAsync_ThrowsFileNotFoundException_WhenSourceDoesNotExist()
+    {
+        await Assert.ThrowsAsync<FileNotFoundException>(() =>
+            _service.TrimVideoAsync("nonexistent_source.mp4", "newclip1", 0.0, 5.0));
+    }
+
     private class FakeWebHostEnvironment : IWebHostEnvironment
     {
         public string WebRootPath { get; set; } = string.Empty;

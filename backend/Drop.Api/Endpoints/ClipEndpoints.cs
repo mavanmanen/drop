@@ -27,6 +27,14 @@ public static class ClipEndpoints
 
     public record ClipCollectionSummaryDto(string Id, string Name);
     public record ClipUpdateRequest(string Title, string? Description, string? Visibility);
+    public record ClipTrimRequest(
+        double StartSeconds,
+        double EndSeconds,
+        string? Title,
+        string? Description,
+        string? Visibility,
+        string? CollectionId
+    );
     public record ClipListResponse(List<ClipDto> Items, int TotalCount, int Page, int PageSize);
 
     public static string NormalizeVisibility(string? v)
@@ -284,6 +292,102 @@ public static class ClipEndpoints
                 .FirstAsync(c => c.Id == id);
 
             return Results.Ok(ToDto(updated));
+        })
+        .RequireAuthorization();
+
+        // Admin: Cut a shorter clip from an existing clip
+        group.MapPost("/{id}/trim", async (
+            string id,
+            ClipTrimRequest req,
+            DropDbContext db,
+            IMediaStorageService mediaStorage) =>
+        {
+            var sourceClip = await db.Clips.FindAsync(id);
+            if (sourceClip == null)
+            {
+                return Results.NotFound(new { error = "Source clip not found" });
+            }
+
+            if (req.StartSeconds < 0)
+            {
+                return Results.BadRequest(new { error = "Start time cannot be negative" });
+            }
+
+            if (req.EndSeconds <= req.StartSeconds)
+            {
+                return Results.BadRequest(new { error = "End time must be greater than start time" });
+            }
+
+            if (sourceClip.DurationSeconds.HasValue && req.StartSeconds >= sourceClip.DurationSeconds.Value)
+            {
+                return Results.BadRequest(new { error = "Start time cannot exceed source clip duration" });
+            }
+
+            var newClipId = mediaStorage.GenerateId(8);
+            var title = !string.IsNullOrWhiteSpace(req.Title)
+                ? req.Title.Trim()
+                : $"{sourceClip.Title} (Cut {Math.Round(req.StartSeconds)}s-{Math.Round(req.EndSeconds)}s)";
+
+            var visibility = !string.IsNullOrWhiteSpace(req.Visibility)
+                ? NormalizeVisibility(req.Visibility)
+                : sourceClip.Visibility;
+
+            try
+            {
+                var (storedFileName, thumbnailFileName, durationSeconds, fileSize) =
+                    await mediaStorage.TrimVideoAsync(sourceClip.StoredFileName, newClipId, req.StartSeconds, req.EndSeconds);
+
+                var newClip = new Clip
+                {
+                    Id = newClipId,
+                    Title = title,
+                    Description = req.Description?.Trim() ?? sourceClip.Description,
+                    OriginalFileName = $"cut_{sourceClip.OriginalFileName}",
+                    StoredFileName = storedFileName,
+                    FileSizeBytes = fileSize,
+                    ContentType = sourceClip.ContentType,
+                    DurationSeconds = durationSeconds,
+                    ThumbnailFileName = thumbnailFileName,
+                    CreatedAtUtc = DateTime.UtcNow,
+                    ViewsCount = 0,
+                    Visibility = visibility
+                };
+
+                db.Clips.Add(newClip);
+
+                if (!string.IsNullOrWhiteSpace(req.CollectionId))
+                {
+                    var collection = await db.Collections.FindAsync(req.CollectionId);
+                    if (collection != null)
+                    {
+                        var maxOrder = await db.CollectionClips
+                            .Where(cc => cc.CollectionId == req.CollectionId)
+                            .Select(cc => (int?)cc.OrderIndex)
+                            .MaxAsync() ?? 0;
+
+                        db.CollectionClips.Add(new CollectionClip
+                        {
+                            CollectionId = req.CollectionId,
+                            ClipId = newClipId,
+                            OrderIndex = maxOrder + 1,
+                            AddedAtUtc = DateTime.UtcNow
+                        });
+                    }
+                }
+
+                await db.SaveChangesAsync();
+
+                var created = await db.Clips
+                    .Include(c => c.CollectionClips)
+                    .ThenInclude(cc => cc.Collection)
+                    .FirstAsync(c => c.Id == newClipId);
+
+                return Results.Created($"/api/clips/{newClipId}", ToDto(created));
+            }
+            catch (Exception ex)
+            {
+                return Results.BadRequest(new { error = $"Trimming failed: {ex.Message}" });
+            }
         })
         .RequireAuthorization();
 

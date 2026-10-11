@@ -20,6 +20,11 @@ public interface IMediaStorageService
     Task<(string storedFileName, string? thumbnailFileName, double? durationSeconds, long fileSize)> SaveUploadedVideoAsync(
         IFormFile file,
         string clipId);
+    Task<(string storedFileName, string? thumbnailFileName, double? durationSeconds, long fileSize)> TrimVideoAsync(
+        string sourceStoredFileName,
+        string newClipId,
+        double startSeconds,
+        double endSeconds);
     void DeleteClipFiles(string storedFileName, string? thumbnailFileName);
     string GetContentType(string fileName);
 }
@@ -136,6 +141,104 @@ public class MediaStorageService : IMediaStorageService
         var durationSeconds = await TryExtractDurationAsync(destinationPath);
 
         return (storedFileName, thumbnailFileName, durationSeconds, fileSize);
+    }
+
+    public async Task<(string storedFileName, string? thumbnailFileName, double? durationSeconds, long fileSize)> TrimVideoAsync(
+        string sourceStoredFileName,
+        string newClipId,
+        double startSeconds,
+        double endSeconds)
+    {
+        var sourcePath = Path.Combine(_clipsDirectory, sourceStoredFileName);
+        if (!File.Exists(sourcePath))
+        {
+            throw new FileNotFoundException($"Source video file '{sourceStoredFileName}' not found.", sourcePath);
+        }
+
+        var ext = Path.GetExtension(sourceStoredFileName);
+        if (string.IsNullOrEmpty(ext)) ext = ".mp4";
+        var outputStoredFileName = $"{newClipId}{ext}";
+        var outputPath = Path.Combine(_clipsDirectory, outputStoredFileName);
+
+        var duration = Math.Max(0.1, endSeconds - startSeconds);
+        var startStr = startSeconds.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture);
+        var durStr = duration.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture);
+
+        // First attempt fast stream copy (-c copy)
+        bool success = false;
+        try
+        {
+            var psi = new ProcessStartInfo
+            {
+                FileName = "ffmpeg",
+                Arguments = $"-y -ss {startStr} -i \"{sourcePath}\" -t {durStr} -c copy \"{outputPath}\"",
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+                CreateNoWindow = true
+            };
+
+            using var process = Process.Start(psi);
+            if (process != null)
+            {
+                var stderrTask = process.StandardError.ReadToEndAsync();
+                var stdoutTask = process.StandardOutput.ReadToEndAsync();
+                await Task.WhenAll(stderrTask, stdoutTask, process.WaitForExitAsync());
+                if (process.ExitCode == 0 && File.Exists(outputPath) && new FileInfo(outputPath).Length > 0)
+                {
+                    success = true;
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "FFmpeg fast copy trim failed for {Source}. Falling back to re-encode.", sourceStoredFileName);
+        }
+
+        // If fast copy failed or produced an empty file, re-encode with standard H.264 / AAC
+        if (!success)
+        {
+            try
+            {
+                var psi = new ProcessStartInfo
+                {
+                    FileName = "ffmpeg",
+                    Arguments = $"-y -ss {startStr} -i \"{sourcePath}\" -t {durStr} -c:v libx264 -preset fast -crf 22 -c:a aac -b:a 192k \"{outputPath}\"",
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    UseShellExecute = false,
+                    CreateNoWindow = true
+                };
+
+                using var process = Process.Start(psi);
+                if (process != null)
+                {
+                    var stderrTask = process.StandardError.ReadToEndAsync();
+                    var stdoutTask = process.StandardOutput.ReadToEndAsync();
+                    await Task.WhenAll(stderrTask, stdoutTask, process.WaitForExitAsync());
+                    if (process.ExitCode == 0 && File.Exists(outputPath) && new FileInfo(outputPath).Length > 0)
+                    {
+                        success = true;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "FFmpeg re-encode trim failed for {Source}", sourceStoredFileName);
+            }
+        }
+
+        if (!success || !File.Exists(outputPath))
+        {
+            throw new InvalidOperationException($"Failed to cut clip from source '{sourceStoredFileName}'.");
+        }
+
+        var fileInfo = new FileInfo(outputPath);
+        var fileSize = fileInfo.Length;
+        var thumbnailFileName = await TryGenerateThumbnailAsync(outputPath, newClipId);
+        var durationSeconds = await TryExtractDurationAsync(outputPath) ?? duration;
+
+        return (outputStoredFileName, thumbnailFileName, durationSeconds, fileSize);
     }
 
     public void DeleteClipFiles(string storedFileName, string? thumbnailFileName)
