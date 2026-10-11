@@ -146,10 +146,19 @@ app.MapCollectionEndpoints();
 app.MapGet("/api/system/status", async (
     DropDbContext db,
     IMediaStorageService mediaStorage,
-    IAuthService authService) =>
+    IAuthService authService,
+    IConfiguration config) =>
 {
     var clipCount = await db.Clips.CountAsync();
     var collectionCount = await db.Collections.CountAsync();
+
+    var rawVisibility = config["DROP_INGEST_DEFAULT_VISIBILITY"]?.Trim().ToLowerInvariant();
+    var defaultIngestVisibility = rawVisibility switch
+    {
+        "unlisted" => "unlisted",
+        "private" => "private",
+        _ => "public"
+    };
 
     return Results.Ok(new
     {
@@ -157,6 +166,7 @@ app.MapGet("/api/system/status", async (
         version = "1.0.0",
         adminUsername = authService.AdminUsername,
         ingestDirectory = mediaStorage.IngestDirectory,
+        defaultIngestVisibility,
         clipsCount = clipCount,
         collectionsCount = collectionCount,
         serverTimeUtc = DateTime.UtcNow

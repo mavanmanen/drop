@@ -67,6 +67,7 @@ Edit `docker-compose.yml` or create an `.env` file to customize:
 | `DROP_INGEST_PATH` | `/data/ingest` | Path to folder monitored for new clips |
 | `DROP_STORAGE_PATH` | `/data/clips` | Path where permanent video files are kept |
 | `DROP_DB_PATH` | `/data/db/drop.db` | SQLite database file location |
+| `DROP_INGEST_DEFAULT_VISIBILITY` | `public` | Default visibility for ingested clips (`public`, `unlisted`, `private`) |
 
 ---
 

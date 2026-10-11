@@ -8,6 +8,7 @@ public class IngestWatcherService : BackgroundService
     private readonly IServiceProvider _serviceProvider;
     private readonly IMediaStorageService _mediaStorage;
     private readonly ILogger<IngestWatcherService> _logger;
+    private readonly string _defaultVisibility;
 
     private static readonly HashSet<string> AllowedExtensions = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -16,19 +17,30 @@ public class IngestWatcherService : BackgroundService
 
     private readonly Dictionary<string, (long Size, DateTime FirstSeen)> _candidateFiles = new();
 
+    public string DefaultVisibility => _defaultVisibility;
+
     public IngestWatcherService(
         IServiceProvider serviceProvider,
         IMediaStorageService mediaStorage,
+        IConfiguration configuration,
         ILogger<IngestWatcherService> logger)
     {
         _serviceProvider = serviceProvider;
         _mediaStorage = mediaStorage;
         _logger = logger;
+
+        var configuredVisibility = configuration["DROP_INGEST_DEFAULT_VISIBILITY"]?.Trim().ToLowerInvariant();
+        _defaultVisibility = configuredVisibility switch
+        {
+            "unlisted" => "unlisted",
+            "private" => "private",
+            _ => "public"
+        };
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        _logger.LogInformation("Ingest folder watcher started for: {IngestDir}", _mediaStorage.IngestDirectory);
+        _logger.LogInformation("Ingest folder watcher started for: {IngestDir} (default visibility: {Visibility})", _mediaStorage.IngestDirectory, _defaultVisibility);
 
         while (!stoppingToken.IsCancellationRequested)
         {
@@ -175,6 +187,7 @@ public class IngestWatcherService : BackgroundService
             ContentType = _mediaStorage.GetContentType(originalFileName),
             DurationSeconds = durationSeconds,
             ThumbnailFileName = thumbnailFileName,
+            Visibility = _defaultVisibility,
             CreatedAtUtc = DateTime.UtcNow,
             ViewsCount = 0
         };

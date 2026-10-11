@@ -19,6 +19,8 @@ services:
       - DROP_INGEST_PATH=/data/ingest
       - DROP_STORAGE_PATH=/data/clips
       - DROP_DB_PATH=/data/db/drop.db
+      # Default visibility for automatically ingested clips (public, unlisted, or private)
+      - DROP_INGEST_DEFAULT_VISIBILITY=public
     volumes:
       # Ingest folder: Drop your gaming recordings/clips here to auto-import!
       - ./data/ingest:/data/ingest
