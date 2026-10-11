@@ -23,15 +23,26 @@ builder.Services.Configure<FormOptions>(options =>
 });
 
 // Configure Database
-var baseDataDir = builder.Configuration["DROP_DATA_DIR"] ?? Path.Combine(AppContext.BaseDirectory, "data");
+var baseDataDir = Path.GetFullPath(builder.Configuration["DROP_DATA_DIR"] ?? Path.Combine(AppContext.BaseDirectory, "data"));
 Directory.CreateDirectory(baseDataDir);
 
 var dbPath = builder.Configuration["DROP_DB_PATH"]
-             ?? Path.Combine(baseDataDir, "drop.db");
+             ?? Path.Combine(baseDataDir, "db", "drop.db");
+dbPath = Path.GetFullPath(dbPath);
+
 var dbDirectory = Path.GetDirectoryName(dbPath);
 if (!string.IsNullOrEmpty(dbDirectory) && !Directory.Exists(dbDirectory))
 {
     Directory.CreateDirectory(dbDirectory);
+}
+
+// Seamless migration: If db was previously located directly in baseDataDir/drop.db, move it to db/
+var legacyDbPath = Path.Combine(baseDataDir, "drop.db");
+if (File.Exists(legacyDbPath) && !File.Exists(dbPath))
+{
+    File.Move(legacyDbPath, dbPath);
+    if (File.Exists(legacyDbPath + "-shm")) File.Move(legacyDbPath + "-shm", dbPath + "-shm", true);
+    if (File.Exists(legacyDbPath + "-wal")) File.Move(legacyDbPath + "-wal", dbPath + "-wal", true);
 }
 
 var connectionString = $"Data Source={dbPath}";
