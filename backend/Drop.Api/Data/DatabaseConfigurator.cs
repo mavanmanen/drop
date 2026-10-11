@@ -143,6 +143,12 @@ public static class DatabaseConfigurator
                 await db.Database.ExecuteSqlRawAsync("ALTER TABLE Collections ADD COLUMN Visibility TEXT NOT NULL DEFAULT 'public';");
             }
             catch { /* Column already exists */ }
+
+            try
+            {
+                await db.Database.ExecuteSqlRawAsync("ALTER TABLE Clips ADD COLUMN ParentClipId TEXT NULL;");
+            }
+            catch { /* Column already exists */ }
         }
         else if (db.Database.IsNpgsql())
         {
@@ -155,6 +161,12 @@ public static class DatabaseConfigurator
             try
             {
                 await db.Database.ExecuteSqlRawAsync("ALTER TABLE \"Collections\" ADD COLUMN IF NOT EXISTS \"Visibility\" text NOT NULL DEFAULT 'public';");
+            }
+            catch { /* Column already exists */ }
+
+            try
+            {
+                await db.Database.ExecuteSqlRawAsync("ALTER TABLE \"Clips\" ADD COLUMN IF NOT EXISTS \"ParentClipId\" text NULL;");
             }
             catch { /* Column already exists */ }
         }

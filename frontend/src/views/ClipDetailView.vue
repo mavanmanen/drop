@@ -22,7 +22,9 @@ import {
   Lock,
   Link2,
   Globe,
-  Scissors
+  Scissors,
+  Film,
+  ArrowUpRight
 } from '@lucide/vue';
 import TrimModal from '../components/TrimModal.vue';
 
@@ -148,6 +150,13 @@ function formatBytes(bytes: number): string {
   const sizes = ['B', 'KB', 'MB', 'GB'];
   const i = Math.floor(Math.log(bytes) / Math.log(k));
   return `${(bytes / Math.pow(k, i)).toFixed(1)} ${sizes[i]}`;
+}
+
+function formatDuration(seconds?: number | null): string {
+  if (!seconds || isNaN(seconds)) return '0:00';
+  const m = Math.floor(seconds / 60);
+  const s = Math.floor(seconds % 60);
+  return `${m}:${s.toString().padStart(2, '0')}`;
 }
 
 function formatDate(dateStr: string): string {
@@ -385,6 +394,62 @@ watch(
               <Plus :size="14" />
               <span>Add</span>
             </button>
+          </div>
+        </div>
+
+        <!-- Source Clip (Parent) if this clip was cut from another -->
+        <div v-if="clip.parentClip" class="side-card lineage-card parent-clip-card">
+          <h3>
+            <Film :size="16" class="card-icon" />
+            <span>Cut From (Source Clip)</span>
+          </h3>
+          <router-link :to="`/clip/${clip.parentClip.id}`" class="lineage-clip-item">
+            <div class="lineage-thumb-wrap">
+              <img :src="clip.parentClip.thumbnailUrl || ''" :alt="clip.parentClip.title" class="lineage-thumb" />
+              <span v-if="clip.parentClip.durationSeconds" class="lineage-dur-badge">
+                {{ formatDuration(clip.parentClip.durationSeconds) }}
+              </span>
+            </div>
+            <div class="lineage-meta">
+              <span class="lineage-title">{{ clip.parentClip.title }}</span>
+              <span class="lineage-sub">
+                <span class="badge badge-subtle">{{ clip.parentClip.visibility }}</span>
+                <span class="lineage-link-hint">
+                  <span>View Original</span>
+                  <ArrowUpRight :size="12" />
+                </span>
+              </span>
+            </div>
+          </router-link>
+        </div>
+
+        <!-- Cut Clips (Children) if any clips were cut from this clip -->
+        <div v-if="clip.childClips && clip.childClips.length > 0" class="side-card lineage-card child-clips-card">
+          <h3>
+            <Scissors :size="16" class="card-icon" />
+            <span>Cut Clips ({{ clip.childClips.length }})</span>
+          </h3>
+          <div class="child-clips-list">
+            <router-link
+              v-for="child in clip.childClips"
+              :key="child.id"
+              :to="`/clip/${child.id}`"
+              class="lineage-clip-item"
+            >
+              <div class="lineage-thumb-wrap">
+                <img :src="child.thumbnailUrl || ''" :alt="child.title" class="lineage-thumb" />
+                <span v-if="child.durationSeconds" class="lineage-dur-badge">
+                  {{ formatDuration(child.durationSeconds) }}
+                </span>
+              </div>
+              <div class="lineage-meta">
+                <span class="lineage-title">{{ child.title }}</span>
+                <span class="lineage-sub">
+                  <span class="badge badge-subtle">{{ child.visibility }}</span>
+                  <span class="lineage-date">{{ formatDate(child.createdAtUtc) }}</span>
+                </span>
+              </div>
+            </router-link>
           </div>
         </div>
 
@@ -756,6 +821,111 @@ export default {
     .form-select-sm {
       padding: 0.35rem 0.6rem;
       font-size: 0.8rem;
+    }
+  }
+}
+
+.lineage-card {
+  .child-clips-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .lineage-clip-item {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    background: $bg-surface;
+    border: 1px solid $border-subtle;
+    border-radius: $radius-md;
+    padding: 0.5rem;
+    text-decoration: none;
+    transition: all $transition-fast;
+
+    &:hover {
+      background: $bg-surface-elevated;
+      border-color: rgba(0, 242, 254, 0.4);
+      transform: translateX(2px);
+
+      .lineage-title {
+        color: $accent-cyan;
+      }
+    }
+
+    .lineage-thumb-wrap {
+      position: relative;
+      width: 72px;
+      aspect-ratio: 16 / 9;
+      background: #000;
+      border-radius: 4px;
+      overflow: hidden;
+      flex-shrink: 0;
+
+      .lineage-thumb {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+      }
+
+      .lineage-dur-badge {
+        position: absolute;
+        bottom: 2px;
+        right: 3px;
+        background: rgba(0, 0, 0, 0.8);
+        color: #fff;
+        font-size: 0.65rem;
+        font-weight: 700;
+        padding: 0.05rem 0.25rem;
+        border-radius: 2px;
+      }
+    }
+
+    .lineage-meta {
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+      min-width: 0;
+      flex: 1;
+
+      .lineage-title {
+        font-size: 0.82rem;
+        font-weight: 600;
+        color: $text-primary;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        transition: color $transition-fast;
+      }
+
+      .lineage-sub {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        font-size: 0.75rem;
+        color: $text-muted;
+
+        .badge-subtle {
+          font-size: 0.65rem;
+          padding: 0.1rem 0.35rem;
+          background: rgba(255, 255, 255, 0.06);
+          color: $text-secondary;
+          border-radius: 3px;
+          text-transform: capitalize;
+        }
+
+        .lineage-link-hint {
+          display: flex;
+          align-items: center;
+          gap: 0.2rem;
+          color: $accent-cyan;
+          font-weight: 500;
+        }
+
+        .lineage-date {
+          font-size: 0.7rem;
+        }
+      }
     }
   }
 }

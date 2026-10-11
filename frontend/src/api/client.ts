@@ -5,6 +5,15 @@ export interface ClipCollectionSummary {
 
 export type Visibility = 'public' | 'unlisted' | 'private';
 
+export interface ClipSummary {
+  id: string;
+  title: string;
+  thumbnailUrl: string | null;
+  durationSeconds: number | null;
+  visibility: Visibility;
+  createdAtUtc: string;
+}
+
 export interface Clip {
   id: string;
   title: string;
@@ -20,6 +29,8 @@ export interface Clip {
   viewsCount: number;
   visibility: Visibility;
   collections: ClipCollectionSummary[];
+  parentClip?: ClipSummary | null;
+  childClips?: ClipSummary[];
 }
 
 export interface ClipListResponse {

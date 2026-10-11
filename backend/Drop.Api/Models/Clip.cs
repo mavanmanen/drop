@@ -15,5 +15,9 @@ public class Clip
     public long ViewsCount { get; set; } = 0;
     public string Visibility { get; set; } = "public"; // public, unlisted, private
 
+    public string? ParentClipId { get; set; }
+    public Clip? ParentClip { get; set; }
+    public List<Clip> ChildClips { get; set; } = [];
+
     public List<CollectionClip> CollectionClips { get; set; } = [];
 }
