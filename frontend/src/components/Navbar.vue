@@ -77,22 +77,16 @@ function onSearch() {
           class="btn btn-primary btn-upload"
           @click="emit('open-upload')"
         >
-          <Upload :size="16" />
+          <Upload :size="15" />
           <span>Upload</span>
         </button>
-
-        <!-- Ingest status badge -->
-        <div class="ingest-indicator" title="Ingest folder watcher active">
-          <span class="pulse-dot"></span>
-          <span class="ingest-label">Ingest Active</span>
-        </div>
 
         <!-- Auth action -->
         <template v-if="auth.isAuthenticated">
           <div class="user-chip">
             <span class="user-name">{{ auth.username }}</span>
             <button class="btn btn-ghost btn-icon" title="Logout" @click="logout">
-              <LogOut :size="16" />
+              <LogOut :size="15" />
             </button>
           </div>
         </template>
@@ -234,52 +228,51 @@ function onSearch() {
 .nav-actions {
   display: flex;
   align-items: center;
-  gap: 0.6rem;
+  gap: 0.5rem;
   margin-left: auto;
-}
 
-.ingest-indicator {
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-  padding: 0.25rem 0.5rem;
-  border-radius: $radius-sm;
-  background: rgba(16, 185, 129, 0.08);
-  border: 1px solid rgba(16, 185, 129, 0.2);
-  font-size: 0.75rem;
-  color: #6ee7b7;
-
-  .pulse-dot {
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    background: $accent-emerald;
+  .btn-upload, .btn-login {
+    height: 32px;
+    padding: 0 0.75rem;
+    font-size: 0.825rem;
   }
 }
 
 .user-chip {
-  display: flex;
+  height: 32px;
+  display: inline-flex;
   align-items: center;
-  gap: 0.4rem;
-  padding: 0.2rem 0.45rem 0.2rem 0.6rem;
+  gap: 0.35rem;
+  padding: 0 0.35rem 0 0.65rem;
   background: $bg-surface-elevated;
   border: 1px solid $border-medium;
-  border-radius: $radius-sm;
-  font-size: 0.8rem;
+  border-radius: $radius-md;
+  font-size: 0.825rem;
 
   .user-name {
-    font-weight: 600;
+    font-weight: 500;
     color: $text-primary;
   }
 
   .btn-icon {
-    padding: 0.25rem;
-    border-radius: 50%;
+    width: 24px;
+    height: 24px;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: $radius-sm;
+    color: $text-muted;
+
+    &:hover {
+      color: $text-primary;
+      background: rgba(255, 255, 255, 0.08);
+    }
   }
 }
 
 @media (max-width: 820px) {
-  .search-wrapper, .ingest-indicator {
+  .search-wrapper {
     display: none;
   }
 }
