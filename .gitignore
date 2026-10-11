@@ -1,0 +1,30 @@
+# .NET artifacts
+**/bin/
+**/obj/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# Node & Frontend build output
+**/node_modules/
+**/dist/
+backend/Drop.Api/wwwroot/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# SQLite Database & Storage Data
+data/
+*.db
+*.db-shm
+*.db-wal
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDEs
+.vscode/
+.idea/

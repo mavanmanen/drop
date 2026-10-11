@@ -1,0 +1,14 @@
+.git
+.github
+.vscode
+.idea
+**/bin
+**/obj
+**/node_modules
+**/wwwroot
+data/
+*.db
+*.db-shm
+*.db-wal
+Dockerfile*
+docker-compose*.yml

@@ -1,0 +1,697 @@
+<script setup lang="ts">
+import { ref, onMounted, computed, watch } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
+import { api, type Clip, type Collection } from '../api/client';
+import { useAuth } from '../stores/auth';
+import { useToast } from '../stores/toast';
+import VideoPlayer from '../components/VideoPlayer.vue';
+import {
+  Share2,
+  Copy,
+  Check,
+  Download,
+  Folder,
+  Plus,
+  Trash2,
+  Edit3,
+  Eye,
+  Clock,
+  HardDrive,
+  FileVideo,
+  ArrowLeft
+} from '@lucide/vue';
+
+const route = useRoute();
+const router = useRouter();
+const { state: auth } = useAuth();
+const { success, error: toastError } = useToast();
+
+const clip = ref<Clip | null>(null);
+const isLoading = ref(true);
+const isEditing = ref(false);
+const editTitle = ref('');
+const editDescription = ref('');
+const allCollections = ref<Collection[]>([]);
+const selectedNewColId = ref('');
+const isCopying = ref(false);
+
+const clipId = computed(() => route.params.id as string);
+
+async function loadClip() {
+  isLoading.value = true;
+  try {
+    clip.value = await api.getClip(clipId.value);
+    editTitle.value = clip.value.title;
+    editDescription.value = clip.value.description || '';
+  } catch (err: any) {
+    console.error('Failed to load clip', err);
+    toastError('Clip not found');
+  } finally {
+    isLoading.value = false;
+  }
+}
+
+async function loadCollections() {
+  if (!auth.isAuthenticated) return;
+  try {
+    allCollections.value = await api.getCollections();
+  } catch (err) {
+    console.error(err);
+  }
+}
+
+async function copyShareLink() {
+  if (!clip.value) return;
+  const url = `${window.location.origin}/clip/${clip.value.id}`;
+  try {
+    await navigator.clipboard.writeText(url);
+    isCopying.value = true;
+    success('Public share link copied to clipboard!');
+    setTimeout(() => {
+      isCopying.value = false;
+    }, 2000);
+  } catch (err) {
+    console.error(err);
+  }
+}
+
+async function saveEdit() {
+  if (!clip.value || !editTitle.value.trim()) return;
+  try {
+    const updated = await api.updateClip(clip.value.id, {
+      title: editTitle.value.trim(),
+      description: editDescription.value.trim() || null,
+    });
+    clip.value = updated;
+    isEditing.value = false;
+    success('Clip details updated!');
+  } catch (err: any) {
+    toastError(err.message || 'Failed to update clip');
+  }
+}
+
+async function deleteClip() {
+  if (!clip.value) return;
+  if (!confirm(`Are you sure you want to delete "${clip.value.title}"? This cannot be undone.`)) {
+    return;
+  }
+
+  try {
+    await api.deleteClip(clip.value.id);
+    success('Clip deleted successfully');
+    router.push('/');
+  } catch (err: any) {
+    toastError(err.message || 'Failed to delete clip');
+  }
+}
+
+async function addToCollection() {
+  if (!clip.value || !selectedNewColId.value) return;
+  try {
+    await api.addClipToCollection(selectedNewColId.value, clip.value.id);
+    success('Added clip to collection');
+    selectedNewColId.value = '';
+    await loadClip();
+  } catch (err: any) {
+    toastError(err.message || 'Failed to add to collection');
+  }
+}
+
+async function removeFromCollection(collectionId: string) {
+  if (!clip.value) return;
+  try {
+    await api.removeClipFromCollection(collectionId, clip.value.id);
+    success('Removed from collection');
+    await loadClip();
+  } catch (err: any) {
+    toastError(err.message || 'Failed to remove from collection');
+  }
+}
+
+function formatBytes(bytes: number): string {
+  if (bytes === 0) return '0 B';
+  const k = 1024;
+  const sizes = ['B', 'KB', 'MB', 'GB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return `${(bytes / Math.pow(k, i)).toFixed(1)} ${sizes[i]}`;
+}
+
+function formatDate(dateStr: string): string {
+  try {
+    return new Date(dateStr).toLocaleString(undefined, {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  } catch {
+    return dateStr;
+  }
+}
+
+onMounted(() => {
+  loadClip();
+  loadCollections();
+});
+
+watch(
+  () => route.params.id,
+  () => {
+    loadClip();
+  }
+);
+</script>
+
+<template>
+  <div class="clip-detail-view">
+    <div class="top-back-bar">
+      <router-link to="/" class="back-link">
+        <ArrowLeft :size="16" />
+        <span>Back to Clips</span>
+      </router-link>
+    </div>
+
+    <div v-if="isLoading" class="loading-box">
+      <div class="loader-spinner"></div>
+      <p>Loading clip...</p>
+    </div>
+
+    <div v-else-if="clip" class="clip-content-layout">
+      <!-- Player column -->
+      <div class="player-column">
+        <VideoPlayer
+          :src="clip.videoUrl"
+          :poster="clip.thumbnailUrl || undefined"
+          :autoplay="true"
+        />
+
+        <!-- Title & Metadata section -->
+        <div class="clip-header-card">
+          <template v-if="!isEditing">
+            <div class="title-and-actions">
+              <h1 class="clip-main-title">{{ clip.title }}</h1>
+              <div v-if="auth.isAuthenticated" class="admin-quick-actions">
+                <button class="btn btn-secondary btn-sm" @click="isEditing = true">
+                  <Edit3 :size="14" />
+                  <span>Edit</span>
+                </button>
+                <button class="btn btn-danger btn-sm" @click="deleteClip">
+                  <Trash2 :size="14" />
+                  <span>Delete</span>
+                </button>
+              </div>
+            </div>
+
+            <p v-if="clip.description" class="clip-description">
+              {{ clip.description }}
+            </p>
+          </template>
+
+          <template v-else>
+            <!-- Edit Form -->
+            <form class="edit-form" @submit.prevent="saveEdit">
+              <div class="form-group">
+                <label>Title</label>
+                <input v-model="editTitle" type="text" class="form-input" required />
+              </div>
+              <div class="form-group">
+                <label>Description</label>
+                <textarea v-model="editDescription" rows="3" class="form-textarea"></textarea>
+              </div>
+              <div class="edit-actions">
+                <button type="button" class="btn btn-secondary btn-sm" @click="isEditing = false">
+                  Cancel
+                </button>
+                <button type="submit" class="btn btn-primary btn-sm">
+                  Save Changes
+                </button>
+              </div>
+            </form>
+          </template>
+
+          <!-- Metrics bar -->
+          <div class="metrics-bar">
+            <div class="metric-item">
+              <Eye :size="15" />
+              <span><strong>{{ clip.viewsCount }}</strong> views</span>
+            </div>
+            <div class="metric-dot">•</div>
+            <div class="metric-item">
+              <Clock :size="15" />
+              <span>{{ formatDate(clip.createdAtUtc) }}</span>
+            </div>
+            <div class="metric-dot">•</div>
+            <div class="metric-item">
+              <HardDrive :size="15" />
+              <span>{{ formatBytes(clip.fileSizeBytes) }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Sidebar / Share Column -->
+      <div class="sidebar-column">
+        <!-- Public Share Card -->
+        <div class="side-card share-card">
+          <h3>
+            <Share2 :size="16" class="card-icon" />
+            <span>Public Share Link</span>
+          </h3>
+          <p class="share-hint">Anyone with this link can watch or embed this clip:</p>
+
+          <div class="share-input-group">
+            <input
+              type="text"
+              readonly
+              :value="`${$route.path ? windowOrigin : ''}/clip/${clip.id}`"
+              class="form-input share-input"
+              @click="copyShareLink"
+            />
+            <button class="btn btn-primary btn-copy" @click="copyShareLink">
+              <Check v-if="isCopying" :size="16" />
+              <Copy v-else :size="16" />
+              <span>{{ isCopying ? 'Copied!' : 'Copy' }}</span>
+            </button>
+          </div>
+
+          <a :href="clip.videoUrl" download class="btn btn-secondary btn-download">
+            <Download :size="15" />
+            <span>Download Original Video</span>
+          </a>
+        </div>
+
+        <!-- Collections Card -->
+        <div class="side-card collections-card">
+          <h3>
+            <Folder :size="16" class="card-icon" />
+            <span>Collections</span>
+          </h3>
+
+          <div v-if="clip.collections && clip.collections.length > 0" class="col-list">
+            <div v-for="col in clip.collections" :key="col.id" class="col-item">
+              <router-link :to="`/collection/${col.id}`" class="col-link">
+                <Folder :size="14" />
+                <span>{{ col.name }}</span>
+              </router-link>
+              <button
+                v-if="auth.isAuthenticated"
+                class="remove-col-btn"
+                title="Remove from this collection"
+                @click="removeFromCollection(col.id)"
+              >
+                &times;
+              </button>
+            </div>
+          </div>
+          <p v-else class="empty-col-text">This clip is not in any collection yet.</p>
+
+          <!-- Add to collection (Admin only) -->
+          <div v-if="auth.isAuthenticated" class="add-col-section">
+            <select v-model="selectedNewColId" class="form-select form-select-sm">
+              <option value="">Select collection...</option>
+              <option
+                v-for="col in allCollections.filter(c => !clip?.collections.some(cc => cc.id === c.id))"
+                :key="col.id"
+                :value="col.id"
+              >
+                {{ col.name }}
+              </option>
+            </select>
+            <button
+              class="btn btn-secondary btn-sm"
+              :disabled="!selectedNewColId"
+              @click="addToCollection"
+            >
+              <Plus :size="14" />
+              <span>Add</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Technical specs -->
+        <div class="side-card specs-card">
+          <h3>
+            <FileVideo :size="16" class="card-icon" />
+            <span>File Details</span>
+          </h3>
+          <ul class="specs-list">
+            <li>
+              <span class="label">Original Name</span>
+              <span class="value text-truncate" :title="clip.originalFileName">{{ clip.originalFileName }}</span>
+            </li>
+            <li>
+              <span class="label">Format</span>
+              <span class="value">{{ clip.contentType }}</span>
+            </li>
+            <li>
+              <span class="label">Public ID</span>
+              <span class="value"><code>{{ clip.id }}</code></span>
+            </li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Error state -->
+    <div v-else class="not-found-state">
+      <h2>Clip Not Found</h2>
+      <p>This clip may have been removed or the link is incorrect.</p>
+      <router-link to="/" class="btn btn-primary">Return Home</router-link>
+    </div>
+  </div>
+</template>
+
+<script lang="ts">
+export default {
+  computed: {
+    windowOrigin() {
+      return typeof window !== 'undefined' ? window.location.origin : '';
+    }
+  }
+}
+</script>
+
+<style scoped lang="scss">
+@use '../assets/styles/variables' as *;
+
+.clip-detail-view {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 1.25rem 1.5rem 3rem;
+  width: 100%;
+}
+
+.top-back-bar {
+  margin-bottom: 1rem;
+
+  .back-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    color: $text-secondary;
+    font-size: 0.85rem;
+    font-weight: 500;
+    text-decoration: none;
+    transition: color $transition-fast;
+
+    &:hover {
+      color: $accent-cyan;
+    }
+  }
+}
+
+.clip-content-layout {
+  display: grid;
+  grid-template-columns: 1fr 360px;
+  gap: 1.75rem;
+  align-items: start;
+
+  @media (max-width: 1024px) {
+    grid-template-columns: 1fr;
+  }
+}
+
+.player-column {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.clip-header-card {
+  background: $bg-card;
+  border: 1px solid $border-subtle;
+  border-radius: $radius-lg;
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+
+  .title-and-actions {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+
+    .clip-main-title {
+      font-size: 1.5rem;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      line-height: 1.3;
+      color: $text-primary;
+    }
+
+    .admin-quick-actions {
+      display: flex;
+      gap: 0.5rem;
+    }
+  }
+
+  .clip-description {
+    font-size: 0.95rem;
+    line-height: 1.6;
+    color: $text-secondary;
+    white-space: pre-wrap;
+  }
+
+  .metrics-bar {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    font-size: 0.82rem;
+    color: $text-muted;
+    border-top: 1px solid $border-subtle;
+    padding-top: 0.85rem;
+
+    .metric-item {
+      display: flex;
+      align-items: center;
+      gap: 0.35rem;
+
+      strong {
+        color: $text-primary;
+      }
+    }
+
+    .metric-dot {
+      color: rgba(255, 255, 255, 0.15);
+    }
+  }
+}
+
+.edit-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+
+  .form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+
+    label {
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: $text-secondary;
+    }
+  }
+
+  .edit-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.5rem;
+  }
+}
+
+.sidebar-column {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.side-card {
+  background: $bg-card;
+  border: 1px solid $border-subtle;
+  border-radius: $radius-lg;
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+
+  h3 {
+    font-size: 0.95rem;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    color: $text-primary;
+
+    .card-icon {
+      color: $accent-cyan;
+    }
+  }
+}
+
+.share-card {
+  .share-hint {
+    font-size: 0.8rem;
+    color: $text-secondary;
+  }
+
+  .share-input-group {
+    display: flex;
+    gap: 0.4rem;
+
+    .share-input {
+      font-size: 0.8rem;
+      background: $bg-root;
+      cursor: pointer;
+    }
+
+    .btn-copy {
+      padding: 0.45rem 0.85rem;
+      white-space: nowrap;
+    }
+  }
+
+  .btn-download {
+    width: 100%;
+    margin-top: 0.25rem;
+  }
+}
+
+.collections-card {
+  .col-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+
+    .col-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: $bg-surface;
+      padding: 0.45rem 0.75rem;
+      border-radius: $radius-sm;
+      border: 1px solid $border-subtle;
+
+      .col-link {
+        display: flex;
+        align-items: center;
+        gap: 0.4rem;
+        color: #c4b5fd;
+        font-size: 0.85rem;
+        text-decoration: none;
+        font-weight: 500;
+
+        &:hover {
+          color: #fff;
+        }
+      }
+
+      .remove-col-btn {
+        background: transparent;
+        border: none;
+        color: $text-muted;
+        cursor: pointer;
+        font-size: 1.1rem;
+        line-height: 1;
+
+        &:hover {
+          color: $accent-rose;
+        }
+      }
+    }
+  }
+
+  .empty-col-text {
+    font-size: 0.8rem;
+    color: $text-muted;
+  }
+
+  .add-col-section {
+    display: flex;
+    gap: 0.4rem;
+    margin-top: 0.5rem;
+    border-top: 1px solid $border-subtle;
+    padding-top: 0.75rem;
+
+    .form-select-sm {
+      padding: 0.35rem 0.6rem;
+      font-size: 0.8rem;
+    }
+  }
+}
+
+.specs-card {
+  .specs-list {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+
+    li {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.8rem;
+
+      .label {
+        color: $text-muted;
+      }
+
+      .value {
+        color: $text-secondary;
+        font-weight: 500;
+
+        code {
+          background: rgba(255, 255, 255, 0.08);
+          padding: 0.1rem 0.35rem;
+          border-radius: 4px;
+          color: $accent-cyan;
+        }
+      }
+
+      .text-truncate {
+        max-width: 180px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+    }
+  }
+}
+
+.btn-sm {
+  padding: 0.35rem 0.7rem;
+  font-size: 0.78rem;
+}
+
+.loading-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 6rem 1rem;
+  gap: 1rem;
+  color: $text-muted;
+
+  .loader-spinner {
+    width: 36px;
+    height: 36px;
+    border: 3px solid rgba(0, 242, 254, 0.15);
+    border-top-color: $accent-cyan;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+}
+
+.not-found-state {
+  text-align: center;
+  padding: 5rem 1rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+}
+</style>

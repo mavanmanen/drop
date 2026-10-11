@@ -1,0 +1,30 @@
+services:
+  drop:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: drop:latest
+    container_name: drop-app
+    restart: unless-stopped
+    ports:
+      - "5000:8080"
+    environment:
+      # Single admin account configuration
+      - DROP_ADMIN_USERNAME=admin
+      - DROP_ADMIN_PASSWORD=change-me-promptly
+      # Optional custom JWT secret (recommended for production)
+      - DROP_JWT_SECRET=replace-with-a-random-32-char-secret-string
+      # Storage and directory paths inside container
+      - DROP_DATA_DIR=/data
+      - DROP_INGEST_PATH=/data/ingest
+      - DROP_STORAGE_PATH=/data/clips
+      - DROP_DB_PATH=/data/db/drop.db
+    volumes:
+      # Ingest folder: Drop your gaming recordings/clips here to auto-import!
+      - ./data/ingest:/data/ingest
+      # Permanent storage for ingested and uploaded clips
+      - ./data/clips:/data/clips
+      # Generated video thumbnails
+      - ./data/thumbnails:/data/thumbnails
+      # SQLite database file
+      - ./data/db:/data/db
