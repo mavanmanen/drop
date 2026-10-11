@@ -57,17 +57,37 @@ The application will be accessible at `http://localhost:5000`.
 To deploy on a remote server or NAS using the published image from GitHub Container Registry (without needing source code or compilers):
 
 ```bash
-# 1. Download docker-compose.prod.yml
-# 2. Update the image name and your secrets, then run:
+# 1. Download docker-compose.prod.yml and .env.prod.example
+# 2. Copy and configure your production environment:
+cp .env.prod.example .env.prod
+
+# 3. Run:
 docker compose -f docker-compose.prod.yml up -d
 ```
 
-### 3. Configure Environment Variables
+### 3. Live Development with Docker Compose Watch
 
-Edit `docker-compose.yml` or create an `.env` file to customize:
+Drop includes `develop.watch` configuration for Docker Compose. Run:
+
+```bash
+docker compose watch
+```
+
+Compose automatically monitors the file tree and rebuilds/reloads the container as you make changes to backend C# files (`Drop.Api`) or Vue 3 frontend components.
+
+### 4. Configure Environment Variables
+
+Drop supports `.env` for development and `.env.prod` for production. Template files are provided in `.env.example` and `.env.prod.example`.
+
+Copy `.env.example` to `.env`:
+
+```bash
+cp .env.example .env
+```
 
 | Variable | Default | Description |
 |---|---|---|
+| `DROP_PORT` | `5000` | Host port mapped to container port 8080 |
 | `DROP_ADMIN_USERNAME` | `admin` | Username for single admin account |
 | `DROP_ADMIN_PASSWORD` | `change-me-promptly` | Password for single admin account |
 | `DROP_JWT_SECRET` | *(auto-generated)* | 32+ character key for JWT token signing |
@@ -83,7 +103,7 @@ Edit `docker-compose.yml` or create an `.env` file to customize:
 | `DROP_POSTGRES_PASSWORD` | `postgres` | PostgreSQL password |
 | `DROP_INGEST_DEFAULT_VISIBILITY` | `public` | Default visibility for ingested clips (`public`, `unlisted`, `private`) |
 
-### 4. Running with PostgreSQL
+### 5. Running with PostgreSQL
 
 To use PostgreSQL instead of SQLite, you can deploy with the included PostgreSQL compose file:
 
