@@ -268,4 +268,65 @@ public class ApiIntegrationTests : IClassFixture<CustomWebApplicationFactory>
         });
         Assert.Equal(HttpStatusCode.BadRequest, startExceedResp.StatusCode);
     }
+
+    [Fact]
+    public async Task ClipParentChild_Relationships_AreIncludedAndPopulated()
+    {
+        var (adminClient, _) = await CreateAdminClientAsync();
+        var parentId = "parent-" + Guid.NewGuid().ToString("N")[..6];
+        var childId = "child-" + Guid.NewGuid().ToString("N")[..6];
+
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<DropDbContext>();
+            var parent = new Clip
+            {
+                Id = parentId,
+                Title = "Parent Long Video",
+                OriginalFileName = "parent.mp4",
+                StoredFileName = $"{parentId}.mp4",
+                FileSizeBytes = 2048,
+                DurationSeconds = 120.0,
+                Visibility = "public"
+            };
+            var child = new Clip
+            {
+                Id = childId,
+                Title = "Child Short Video",
+                OriginalFileName = "child.mp4",
+                StoredFileName = $"{childId}.mp4",
+                FileSizeBytes = 512,
+                DurationSeconds = 15.0,
+                Visibility = "public",
+                ParentClipId = parentId
+            };
+            db.Clips.AddRange(parent, child);
+            await db.SaveChangesAsync();
+        }
+
+        // Fetch child clip -> must show parentClip
+        var childResp = await adminClient.GetFromJsonAsync<JsonElement>($"/api/clips/{childId}");
+        Assert.True(childResp.TryGetProperty("parentClip", out var parentObj));
+        Assert.Equal(parentId, parentObj.GetProperty("id").GetString());
+        Assert.Equal("Parent Long Video", parentObj.GetProperty("title").GetString());
+
+        // Fetch parent clip -> must show childClips
+        var parentResp = await adminClient.GetFromJsonAsync<JsonElement>($"/api/clips/{parentId}");
+        Assert.True(parentResp.TryGetProperty("childClips", out var childrenArr));
+        var childrenList = childrenArr.EnumerateArray().ToList();
+        Assert.Contains(childrenList, c => c.GetProperty("id").GetString() == childId);
+
+        // Deleting the parent clip must NOT delete the child clip
+        var deleteParentResp = await adminClient.DeleteAsync($"/api/clips/{parentId}");
+        Assert.Equal(HttpStatusCode.OK, deleteParentResp.StatusCode);
+
+        // Child clip still exists and can be retrieved
+        var childAfterDeleteResp = await adminClient.GetAsync($"/api/clips/{childId}");
+        Assert.Equal(HttpStatusCode.OK, childAfterDeleteResp.StatusCode);
+
+        // Parent clip reference on child is now null
+        var childAfterDeleteJson = await childAfterDeleteResp.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.True(childAfterDeleteJson.TryGetProperty("parentClip", out var parentAfterDelete));
+        Assert.Equal(JsonValueKind.Null, parentAfterDelete.ValueKind);
+    }
 }

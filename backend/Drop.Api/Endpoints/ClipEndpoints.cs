@@ -22,7 +22,18 @@ public static class ClipEndpoints
         DateTime CreatedAtUtc,
         long ViewsCount,
         string Visibility,
-        List<ClipCollectionSummaryDto> Collections
+        List<ClipCollectionSummaryDto> Collections,
+        ClipSummaryDto? ParentClip,
+        List<ClipSummaryDto> ChildClips
+    );
+
+    public record ClipSummaryDto(
+        string Id,
+        string Title,
+        string? ThumbnailUrl,
+        double? DurationSeconds,
+        string Visibility,
+        DateTime CreatedAtUtc
     );
 
     public record ClipCollectionSummaryDto(string Id, string Name);
@@ -109,14 +120,17 @@ public static class ClipEndpoints
         // Get single clip: Public and unlisted can be viewed by anyone with direct link; Private requires admin
         group.MapGet("/{id}", async (string id, DropDbContext db, IAuthService authService, HttpContext httpContext) =>
         {
+            var isAdmin = authService.IsAdmin(httpContext);
+
             var clip = await db.Clips
                 .Include(c => c.CollectionClips)
                 .ThenInclude(cc => cc.Collection)
+                .Include(c => c.ParentClip)
+                .Include(c => c.ChildClips)
                 .FirstOrDefaultAsync(c => c.Id == id);
 
             if (clip == null) return Results.NotFound(new { error = "Clip not found" });
 
-            var isAdmin = authService.IsAdmin(httpContext);
             if (clip.Visibility == "private" && !isAdmin)
             {
                 return Results.NotFound(new { error = "Clip not found" });
@@ -126,7 +140,7 @@ public static class ClipEndpoints
             clip.ViewsCount++;
             await db.SaveChangesAsync();
 
-            return Results.Ok(ToDto(clip));
+            return Results.Ok(ToDto(clip, isAdmin));
         });
 
         // Stream video: Private clips require admin
@@ -350,7 +364,8 @@ public static class ClipEndpoints
                     ThumbnailFileName = thumbnailFileName,
                     CreatedAtUtc = DateTime.UtcNow,
                     ViewsCount = 0,
-                    Visibility = visibility
+                    Visibility = visibility,
+                    ParentClipId = sourceClip.Id
                 };
 
                 db.Clips.Add(newClip);
@@ -380,9 +395,11 @@ public static class ClipEndpoints
                 var created = await db.Clips
                     .Include(c => c.CollectionClips)
                     .ThenInclude(cc => cc.Collection)
+                    .Include(c => c.ParentClip)
+                    .Include(c => c.ChildClips)
                     .FirstAsync(c => c.Id == newClipId);
 
-                return Results.Created($"/api/clips/{newClipId}", ToDto(created));
+                return Results.Created($"/api/clips/{newClipId}", ToDto(created, isAdmin: true));
             }
             catch (Exception ex)
             {
@@ -407,7 +424,7 @@ public static class ClipEndpoints
         .RequireAuthorization();
     }
 
-    public static ClipDto ToDto(Clip clip) => new(
+    public static ClipDto ToDto(Clip clip, bool isAdmin = true) => new(
         Id: clip.Id,
         Title: clip.Title,
         Description: clip.Description,
@@ -425,6 +442,23 @@ public static class ClipEndpoints
             .Where(cc => cc.Collection != null)
             .OrderBy(cc => cc.OrderIndex)
             .Select(cc => new ClipCollectionSummaryDto(cc.CollectionId, cc.Collection.Name))
+            .ToList(),
+        ParentClip: clip.ParentClip != null && (isAdmin || clip.ParentClip.Visibility != "private")
+            ? ToSummaryDto(clip.ParentClip)
+            : null,
+        ChildClips: (clip.ChildClips ?? [])
+            .Where(c => isAdmin || c.Visibility != "private")
+            .OrderByDescending(c => c.CreatedAtUtc)
+            .Select(c => ToSummaryDto(c))
             .ToList()
+    );
+
+    public static ClipSummaryDto ToSummaryDto(Clip clip) => new(
+        Id: clip.Id,
+        Title: clip.Title,
+        ThumbnailUrl: $"/api/clips/{clip.Id}/thumbnail",
+        DurationSeconds: clip.DurationSeconds,
+        Visibility: clip.Visibility ?? "public",
+        CreatedAtUtc: clip.CreatedAtUtc
     );
 }

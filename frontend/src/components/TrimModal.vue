@@ -170,6 +170,99 @@ async function handleTrim() {
   }
 }
 
+const timelineRef = ref<HTMLDivElement | null>(null);
+const draggingHandle = ref<'start' | 'end' | 'slice' | null>(null);
+let dragStartX = 0;
+let dragInitialStart = 0;
+let dragInitialEnd = 0;
+
+function getTimeFromClientX(clientX: number): number {
+  if (!timelineRef.value) return 0;
+  const rect = timelineRef.value.getBoundingClientRect();
+  const clampedX = Math.max(0, Math.min(rect.width, clientX - rect.left));
+  const ratio = clampedX / rect.width;
+  return Number((ratio * duration.value).toFixed(1));
+}
+
+function onTimelineTrackClick(e: MouseEvent) {
+  // If user clicked directly on the track (not dragging a handle)
+  if (draggingHandle.value) return;
+  const targetTime = getTimeFromClientX(e.clientX);
+  if (previewVideo.value) {
+    previewVideo.value.currentTime = targetTime;
+    previewTime.value = targetTime;
+  }
+}
+
+function startDragging(handle: 'start' | 'end' | 'slice', e: PointerEvent) {
+  e.preventDefault();
+  e.stopPropagation();
+  draggingHandle.value = handle;
+  dragStartX = e.clientX;
+  dragInitialStart = startTime.value;
+  dragInitialEnd = endTime.value;
+
+  (e.target as HTMLElement).setPointerCapture(e.pointerId);
+
+  window.addEventListener('pointermove', onPointerMove);
+  window.addEventListener('pointerup', onPointerUp);
+}
+
+function onPointerMove(e: PointerEvent) {
+  if (!draggingHandle.value || !timelineRef.value) return;
+
+  const rect = timelineRef.value.getBoundingClientRect();
+  const deltaX = e.clientX - dragStartX;
+  const deltaTime = (deltaX / rect.width) * duration.value;
+
+  if (draggingHandle.value === 'start') {
+    let newStart = Number((dragInitialStart + deltaTime).toFixed(1));
+    newStart = Math.max(0, Math.min(endTime.value - 0.2, newStart));
+    startTime.value = newStart;
+    if (previewVideo.value) {
+      previewVideo.value.currentTime = newStart;
+      previewTime.value = newStart;
+    }
+  } else if (draggingHandle.value === 'end') {
+    let newEnd = Number((dragInitialEnd + deltaTime).toFixed(1));
+    newEnd = Math.min(duration.value, Math.max(startTime.value + 0.2, newEnd));
+    endTime.value = newEnd;
+    if (previewVideo.value) {
+      previewVideo.value.currentTime = newEnd;
+      previewTime.value = newEnd;
+    }
+  } else if (draggingHandle.value === 'slice') {
+    const sliceLen = dragInitialEnd - dragInitialStart;
+    let newStart = Number((dragInitialStart + deltaTime).toFixed(1));
+    let newEnd = Number((newStart + sliceLen).toFixed(1));
+
+    if (newStart < 0) {
+      newStart = 0;
+      newEnd = sliceLen;
+    } else if (newEnd > duration.value) {
+      newEnd = duration.value;
+      newStart = Math.max(0, duration.value - sliceLen);
+    }
+    startTime.value = Number(newStart.toFixed(1));
+    endTime.value = Number(newEnd.toFixed(1));
+    if (previewVideo.value) {
+      previewVideo.value.currentTime = startTime.value;
+      previewTime.value = startTime.value;
+    }
+  }
+}
+
+function onPointerUp(e: PointerEvent) {
+  if (draggingHandle.value) {
+    try {
+      (e.target as HTMLElement)?.releasePointerCapture(e.pointerId);
+    } catch {}
+    draggingHandle.value = null;
+  }
+  window.removeEventListener('pointermove', onPointerMove);
+  window.removeEventListener('pointerup', onPointerUp);
+}
+
 function onKeydown(e: KeyboardEvent) {
   if (e.key === 'Escape' && props.show) {
     emit('close');
@@ -182,6 +275,8 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   window.removeEventListener('keydown', onKeydown);
+  window.removeEventListener('pointermove', onPointerMove);
+  window.removeEventListener('pointerup', onPointerUp);
 });
 </script>
 
@@ -226,15 +321,47 @@ onBeforeUnmount(() => {
               <span class="transport-dur">Total: {{ formatTime(duration) }}</span>
             </div>
 
-            <!-- Visual timeline bar -->
-            <div class="timeline-slider-box">
+            <!-- Interactive timeline track with draggable start/end handles -->
+            <div
+              ref="timelineRef"
+              class="timeline-slider-box"
+              @click="onTimelineTrackClick"
+            >
+              <!-- Draggable cut segment -->
               <div
                 class="timeline-active-slice"
+                :class="{ dragging: draggingHandle === 'slice' }"
                 :style="{
                   left: `${(startTime / duration) * 100}%`,
                   width: `${(cutDuration / duration) * 100}%`
                 }"
-              ></div>
+                title="Drag to shift cut range"
+                @pointerdown="startDragging('slice', $event)"
+              >
+                <!-- Start Slider Handle -->
+                <div
+                  class="trim-handle trim-handle-start"
+                  :class="{ active: draggingHandle === 'start' }"
+                  title="Drag to adjust Start time"
+                  @pointerdown="startDragging('start', $event)"
+                >
+                  <div class="handle-grip"></div>
+                  <div class="handle-tooltip">{{ formatTime(startTime) }}</div>
+                </div>
+
+                <!-- End Slider Handle -->
+                <div
+                  class="trim-handle trim-handle-end"
+                  :class="{ active: draggingHandle === 'end' }"
+                  title="Drag to adjust End time"
+                  @pointerdown="startDragging('end', $event)"
+                >
+                  <div class="handle-grip"></div>
+                  <div class="handle-tooltip">{{ formatTime(endTime) }}</div>
+                </div>
+              </div>
+
+              <!-- Video playback position indicator -->
               <div
                 class="timeline-playhead"
                 :style="{ left: `${(previewTime / duration) * 100}%` }"
@@ -266,7 +393,7 @@ onBeforeUnmount(() => {
                 <input
                   v-model.number="startTime"
                   type="number"
-                  step="0.1"
+                  step="any"
                   min="0"
                   :max="endTime - 0.1"
                   class="form-input"
@@ -283,7 +410,7 @@ onBeforeUnmount(() => {
                 <input
                   v-model.number="endTime"
                   type="number"
-                  step="0.1"
+                  step="any"
                   :min="startTime + 0.1"
                   :max="duration"
                   class="form-input"
@@ -529,27 +656,109 @@ onBeforeUnmount(() => {
   .timeline-slider-box {
     position: relative;
     width: 100%;
-    height: 10px;
-    background: rgba(255, 255, 255, 0.1);
-    border-radius: 5px;
-    overflow: hidden;
+    height: 24px;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 6px;
+    user-select: none;
+    cursor: pointer;
+    margin: 0.5rem 0 0.25rem;
 
     .timeline-active-slice {
       position: absolute;
       top: 0;
-      height: 100%;
-      background: rgba(0, 242, 254, 0.45);
-      border-left: 2px solid $accent-cyan;
-      border-right: 2px solid $accent-cyan;
+      bottom: 0;
+      background: rgba(0, 242, 254, 0.28);
+      border-top: 1px solid rgba(0, 242, 254, 0.6);
+      border-bottom: 1px solid rgba(0, 242, 254, 0.6);
+      cursor: grab;
+      touch-action: none;
+
+      &.dragging {
+        cursor: grabbing;
+        background: rgba(0, 242, 254, 0.42);
+      }
+    }
+
+    .trim-handle {
+      position: absolute;
+      top: -4px;
+      bottom: -4px;
+      width: 14px;
+      background: $accent-cyan;
+      border-radius: 4px;
+      cursor: ew-resize;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 0 10px rgba(0, 242, 254, 0.8), 0 2px 6px rgba(0, 0, 0, 0.6);
+      touch-action: none;
+      z-index: 10;
+      transition: transform $transition-fast, background $transition-fast;
+
+      .handle-grip {
+        width: 2px;
+        height: 12px;
+        background: #050811;
+        border-radius: 1px;
+      }
+
+      .handle-tooltip {
+        position: absolute;
+        bottom: calc(100% + 6px);
+        left: 50%;
+        transform: translateX(-50%);
+        background: #0d111c;
+        border: 1px solid rgba(0, 242, 254, 0.4);
+        color: #fff;
+        font-size: 0.7rem;
+        font-weight: 700;
+        padding: 0.15rem 0.4rem;
+        border-radius: 4px;
+        white-space: nowrap;
+        pointer-events: none;
+        opacity: 0;
+        transition: opacity $transition-fast;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+      }
+
+      &:hover, &.active {
+        background: #fff;
+        transform: scaleY(1.08);
+
+        .handle-tooltip {
+          opacity: 1;
+        }
+      }
+
+      &.trim-handle-start {
+        left: 0;
+        transform: translateX(-50%);
+
+        &:hover, &.active {
+          transform: translateX(-50%) scaleY(1.08);
+        }
+      }
+
+      &.trim-handle-end {
+        right: 0;
+        transform: translateX(50%);
+
+        &:hover, &.active {
+          transform: translateX(50%) scaleY(1.08);
+        }
+      }
     }
 
     .timeline-playhead {
       position: absolute;
-      top: 0;
-      width: 3px;
-      height: 100%;
-      background: #fff;
-      box-shadow: 0 0 6px rgba(255, 255, 255, 0.8);
+      top: -2px;
+      bottom: -2px;
+      width: 2px;
+      background: #ffffff;
+      box-shadow: 0 0 8px rgba(255, 255, 255, 0.9);
+      pointer-events: none;
+      z-index: 5;
     }
   }
 
