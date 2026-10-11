@@ -1,24 +1,24 @@
-// Color Palette
-$bg-root: #0b0d13;
-$bg-surface: #12151f;
-$bg-surface-elevated: #181d2a;
-$bg-card: rgba(22, 27, 40, 0.75);
-$bg-card-hover: rgba(28, 35, 52, 0.9);
-$bg-input: #0f121b;
+// Color Palette - Crisp, balanced neutral dark theme
+$bg-root: #090a0f;
+$bg-surface: #10131a;
+$bg-surface-elevated: #161a24;
+$bg-card: #11141c;
+$bg-card-hover: #161a25;
+$bg-input: #0c0f15;
 
-// Accents
-$accent-cyan: #00f2fe;
-$accent-cyan-glow: rgba(0, 242, 254, 0.25);
-$accent-violet: #8b5cf6;
-$accent-violet-glow: rgba(139, 92, 246, 0.25);
+// Accents - Focused, refined, without neon blowouts
+$accent-cyan: #38bdf8; // Soft modern sky blue
+$accent-cyan-glow: rgba(56, 189, 248, 0.12);
+$accent-violet: #818cf8; // Soft indigo
+$accent-violet-glow: rgba(129, 140, 248, 0.12);
 $accent-emerald: #10b981;
 $accent-rose: #f43f5e;
 $accent-amber: #f59e0b;
 
-// Borders & Dividers
+// Borders & Dividers - Precise hairlines
 $border-subtle: rgba(255, 255, 255, 0.08);
-$border-medium: rgba(255, 255, 255, 0.14);
-$border-cyan: rgba(0, 242, 254, 0.4);
+$border-medium: rgba(255, 255, 255, 0.15);
+$border-cyan: rgba(56, 189, 248, 0.5);
 
 // Text
 $text-primary: #f8fafc;
@@ -26,16 +26,17 @@ $text-secondary: #94a3b8;
 $text-muted: #64748b;
 $text-highlight: #ffffff;
 
-// Spacing & Radii
-$radius-sm: 6px;
-$radius-md: 10px;
-$radius-lg: 16px;
-$radius-xl: 22px;
+// Spacing & Radii - Tight, structured, minimal
+$radius-xs: 2px;
+$radius-sm: 4px;
+$radius-md: 6px;
+$radius-lg: 8px;
+$radius-xl: 10px;
 
-// Shadows & Effects
-$shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.3);
-$shadow-card: 0 8px 24px -4px rgba(0, 0, 0, 0.45);
-$shadow-glow: 0 0 20px rgba(0, 242, 254, 0.2);
-$backdrop-blur: blur(16px);
-$transition-fast: 0.15s ease;
-$transition-smooth: 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+// Shadows & Effects - Flat, grounded elevation without neon glows
+$shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+$shadow-card: 0 4px 16px rgba(0, 0, 0, 0.4);
+$shadow-glow: none;
+$backdrop-blur: none;
+$transition-fast: 0.12s ease;
+$transition-smooth: 0.18s cubic-bezier(0.16, 1, 0.3, 1);

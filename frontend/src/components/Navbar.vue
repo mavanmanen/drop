@@ -114,10 +114,9 @@ function onSearch() {
   position: sticky;
   top: 0;
   z-index: 100;
-  background: rgba(11, 13, 19, 0.85);
-  backdrop-filter: $backdrop-blur;
+  background: $bg-root;
   border-bottom: 1px solid $border-subtle;
-  padding: 0.75rem 1.5rem;
+  padding: 0.65rem 1.5rem;
 }
 
 .nav-container {
@@ -125,7 +124,7 @@ function onSearch() {
   margin: 0 auto;
   display: flex;
   align-items: center;
-  gap: 1.5rem;
+  gap: 1.25rem;
 }
 
 .brand {
@@ -136,55 +135,52 @@ function onSearch() {
   color: $text-primary;
 
   .logo-box {
-    width: 36px;
-    height: 36px;
-    border-radius: $radius-md;
-    background: linear-gradient(135deg, $accent-cyan 0%, $accent-violet 100%);
+    width: 28px;
+    height: 28px;
+    border-radius: $radius-sm;
+    background: #2563eb;
     display: flex;
     align-items: center;
     justify-content: center;
-    color: #050811;
-    box-shadow: 0 4px 12px $accent-cyan-glow;
+    color: #ffffff;
   }
 
   .brand-text {
-    font-size: 1.35rem;
-    font-weight: 800;
-    letter-spacing: -0.04em;
-    background: linear-gradient(135deg, #ffffff 40%, $accent-cyan 100%);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
+    font-size: 1.15rem;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    color: $text-primary;
   }
 
   .brand-tag {
-    font-size: 0.7rem;
-    font-weight: 700;
+    font-size: 0.65rem;
+    font-weight: 600;
     text-transform: uppercase;
-    letter-spacing: 0.08em;
-    padding: 0.15rem 0.4rem;
-    border-radius: 4px;
-    background: rgba(0, 242, 254, 0.12);
-    color: $accent-cyan;
-    border: 1px solid rgba(0, 242, 254, 0.25);
+    letter-spacing: 0.05em;
+    padding: 0.1rem 0.35rem;
+    border-radius: $radius-xs;
+    background: rgba(255, 255, 255, 0.08);
+    color: $text-secondary;
+    border: 1px solid $border-subtle;
   }
 }
 
 .nav-links {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.25rem;
 
   .nav-link {
     display: flex;
     align-items: center;
     gap: 0.4rem;
-    padding: 0.45rem 0.85rem;
-    border-radius: $radius-md;
+    padding: 0.35rem 0.65rem;
+    border-radius: $radius-sm;
     color: $text-secondary;
-    font-size: 0.875rem;
+    font-size: 0.85rem;
     font-weight: 500;
     text-decoration: none;
-    transition: all $transition-fast;
+    transition: color $transition-fast, background-color $transition-fast;
 
     &:hover {
       color: $text-primary;
@@ -192,8 +188,8 @@ function onSearch() {
     }
 
     &.active {
-      color: $accent-cyan;
-      background: rgba(0, 242, 254, 0.08);
+      color: $text-primary;
+      background: rgba(255, 255, 255, 0.08);
       font-weight: 600;
     }
   }
@@ -201,14 +197,14 @@ function onSearch() {
 
 .search-wrapper {
   flex: 1;
-  max-width: 360px;
+  max-width: 320px;
   position: relative;
   display: flex;
   align-items: center;
 
   .search-icon {
     position: absolute;
-    left: 0.75rem;
+    left: 0.65rem;
     color: $text-muted;
     pointer-events: none;
   }
@@ -216,18 +212,17 @@ function onSearch() {
   .search-input {
     width: 100%;
     background: $bg-surface;
-    border: 1px solid $border-subtle;
-    border-radius: 20px;
-    padding: 0.45rem 0.9rem 0.45rem 2.2rem;
+    border: 1px solid $border-medium;
+    border-radius: $radius-sm;
+    padding: 0.35rem 0.75rem 0.35rem 2rem;
     color: $text-primary;
-    font-size: 0.85rem;
-    transition: all $transition-fast;
+    font-size: 0.825rem;
+    transition: border-color $transition-fast;
 
     &:focus {
       outline: none;
-      border-color: $accent-cyan;
-      background: $bg-surface-elevated;
-      box-shadow: 0 0 0 3px rgba(0, 242, 254, 0.12);
+      border-color: #3b82f6;
+      background: $bg-input;
     }
 
     &::placeholder {
@@ -239,45 +234,38 @@ function onSearch() {
 .nav-actions {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
+  gap: 0.6rem;
   margin-left: auto;
 }
 
 .ingest-indicator {
   display: flex;
   align-items: center;
-  gap: 0.45rem;
-  padding: 0.35rem 0.65rem;
-  border-radius: 20px;
+  gap: 0.4rem;
+  padding: 0.25rem 0.5rem;
+  border-radius: $radius-sm;
   background: rgba(16, 185, 129, 0.08);
   border: 1px solid rgba(16, 185, 129, 0.2);
   font-size: 0.75rem;
-  color: #a7f3d0;
+  color: #6ee7b7;
 
   .pulse-dot {
-    width: 7px;
-    height: 7px;
+    width: 6px;
+    height: 6px;
     border-radius: 50%;
     background: $accent-emerald;
-    box-shadow: 0 0 8px $accent-emerald;
-    animation: pulseGlow 2s infinite;
   }
-}
-
-@keyframes pulseGlow {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50% { opacity: 0.5; transform: scale(0.85); }
 }
 
 .user-chip {
   display: flex;
   align-items: center;
   gap: 0.4rem;
-  padding: 0.25rem 0.5rem 0.25rem 0.75rem;
+  padding: 0.2rem 0.45rem 0.2rem 0.6rem;
   background: $bg-surface-elevated;
   border: 1px solid $border-medium;
-  border-radius: 20px;
-  font-size: 0.85rem;
+  border-radius: $radius-sm;
+  font-size: 0.8rem;
 
   .user-name {
     font-weight: 600;

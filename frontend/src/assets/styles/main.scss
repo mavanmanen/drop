@@ -10,7 +10,7 @@ html, body {
   height: 100%;
   background-color: $bg-root;
   color: $text-primary;
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   overflow-x: hidden;
@@ -24,18 +24,18 @@ html, body {
 
 /* Custom Scrollbars */
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 6px;
+  height: 6px;
 }
 ::-webkit-scrollbar-track {
   background: $bg-root;
 }
 ::-webkit-scrollbar-thumb {
-  background: #1f2738;
-  border-radius: 4px;
+  background: #1c202a;
+  border-radius: $radius-xs;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #2f3a54;
+  background: #2a3140;
 }
 
 /* Buttons */
@@ -43,35 +43,34 @@ html, body {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 0.5rem;
-  padding: 0.55rem 1.1rem;
+  gap: 0.45rem;
+  padding: 0.45rem 0.9rem;
   border-radius: $radius-md;
-  font-weight: 600;
-  font-size: 0.875rem;
+  font-weight: 500;
+  font-size: 0.85rem;
   cursor: pointer;
   white-space: nowrap;
-  transition: all $transition-fast;
+  transition: background-color $transition-fast, border-color $transition-fast, color $transition-fast;
   border: 1px solid transparent;
   text-decoration: none;
   user-select: none;
 
   &:disabled {
-    opacity: 0.5;
+    opacity: 0.4;
     cursor: not-allowed;
   }
 
   &.btn-primary {
-    background: linear-gradient(135deg, $accent-cyan 0%, #0099ff 100%);
-    color: #050811;
-    box-shadow: 0 4px 14px $accent-cyan-glow;
+    background: #2563eb;
+    color: #ffffff;
+    border-color: #2563eb;
 
     &:hover:not(:disabled) {
-      filter: brightness(1.1);
-      transform: translateY(-1px);
-      box-shadow: 0 6px 20px rgba(0, 242, 254, 0.4);
+      background: #1d4ed8;
+      border-color: #1d4ed8;
     }
     &:active:not(:disabled) {
-      transform: translateY(0);
+      background: #1e40af;
     }
   }
 
@@ -81,8 +80,11 @@ html, body {
     border-color: $border-medium;
 
     &:hover:not(:disabled) {
-      background: #222a3d;
-      border-color: rgba(255, 255, 255, 0.25);
+      background: #1e2433;
+      border-color: rgba(255, 255, 255, 0.22);
+    }
+    &:active:not(:disabled) {
+      background: #181d28;
     }
   }
 
@@ -91,18 +93,18 @@ html, body {
     color: $text-secondary;
 
     &:hover:not(:disabled) {
-      background: rgba(255, 255, 255, 0.06);
+      background: rgba(255, 255, 255, 0.05);
       color: $text-primary;
     }
   }
 
   &.btn-danger {
-    background: rgba($accent-rose, 0.15);
-    color: #fda4af;
-    border-color: rgba($accent-rose, 0.3);
+    background: rgba($accent-rose, 0.1);
+    color: #fca5a5;
+    border-color: rgba($accent-rose, 0.25);
 
     &:hover:not(:disabled) {
-      background: rgba($accent-rose, 0.25);
+      background: rgba($accent-rose, 0.2);
       border-color: $accent-rose;
       color: #fff;
     }
@@ -115,16 +117,15 @@ html, body {
   background-color: $bg-input;
   color: $text-primary;
   border: 1px solid $border-medium;
-  border-radius: $radius-md;
-  padding: 0.65rem 0.9rem;
-  font-size: 0.9rem;
+  border-radius: $radius-sm;
+  padding: 0.55rem 0.75rem;
+  font-size: 0.875rem;
   font-family: inherit;
-  transition: border-color $transition-fast, box-shadow $transition-fast;
+  transition: border-color $transition-fast;
 
   &:focus {
     outline: none;
-    border-color: $accent-cyan;
-    box-shadow: 0 0 0 3px rgba(0, 242, 254, 0.15);
+    border-color: #3b82f6;
   }
 
   &::placeholder {
@@ -136,37 +137,37 @@ html, body {
 .badge {
   display: inline-flex;
   align-items: center;
-  gap: 0.25rem;
-  padding: 0.2rem 0.55rem;
-  font-size: 0.72rem;
-  font-weight: 600;
-  border-radius: $radius-sm;
-  background: rgba(255, 255, 255, 0.08);
+  gap: 0.3rem;
+  padding: 0.15rem 0.45rem;
+  font-size: 0.7rem;
+  font-weight: 500;
+  border-radius: $radius-xs;
+  background: rgba(255, 255, 255, 0.06);
   color: $text-secondary;
   border: 1px solid $border-subtle;
 
   &.badge-cyan {
-    background: rgba(0, 242, 254, 0.12);
-    color: $accent-cyan;
-    border-color: rgba(0, 242, 254, 0.3);
+    background: rgba(56, 189, 248, 0.1);
+    color: #38bdf8;
+    border-color: rgba(56, 189, 248, 0.25);
   }
 
   &.badge-violet {
-    background: rgba(139, 92, 246, 0.15);
-    color: #c4b5fd;
-    border-color: rgba(139, 92, 246, 0.3);
+    background: rgba(129, 140, 248, 0.1);
+    color: #a5b4fc;
+    border-color: rgba(129, 140, 248, 0.25);
   }
 
   &.badge-amber {
-    background: rgba($accent-amber, 0.15);
-    color: #fcd34d;
-    border-color: rgba($accent-amber, 0.35);
+    background: rgba($accent-amber, 0.1);
+    color: #fbbf24;
+    border-color: rgba($accent-amber, 0.25);
   }
 
   &.badge-rose {
-    background: rgba($accent-rose, 0.15);
+    background: rgba($accent-rose, 0.1);
     color: #fda4af;
-    border-color: rgba($accent-rose, 0.35);
+    border-color: rgba($accent-rose, 0.25);
   }
 }
 
@@ -179,60 +180,58 @@ dialog {
   margin: auto;
 
   &::backdrop {
-    background: rgba(5, 7, 12, 0.75);
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
+    background: rgba(0, 0, 0, 0.75);
   }
 }
 
 .modal-card {
-  background: #141824;
+  background: $bg-surface;
   border: 1px solid $border-medium;
-  border-radius: $radius-xl;
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6);
-  padding: 1.75rem;
+  border-radius: $radius-lg;
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.6);
+  padding: 1.5rem;
   width: 100%;
-  max-width: 520px;
+  max-width: 500px;
   color: $text-primary;
 }
 
 /* Toast Notifications */
 .toast-container {
   position: fixed;
-  bottom: 1.5rem;
-  right: 1.5rem;
+  bottom: 1.25rem;
+  right: 1.25rem;
   z-index: 9999;
   display: flex;
   flex-direction: column;
-  gap: 0.6rem;
+  gap: 0.5rem;
 }
 
 .toast {
-  background: #1a2030;
+  background: $bg-surface-elevated;
   border: 1px solid $border-medium;
   color: $text-primary;
-  padding: 0.75rem 1.25rem;
-  border-radius: $radius-md;
-  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+  padding: 0.65rem 1rem;
+  border-radius: $radius-sm;
+  box-shadow: $shadow-card;
   display: flex;
   align-items: center;
-  gap: 0.6rem;
-  font-size: 0.875rem;
-  animation: slideInToast 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  gap: 0.5rem;
+  font-size: 0.85rem;
+  animation: slideInToast 0.15s ease-out;
 
   &.toast-success {
-    border-color: rgba($accent-emerald, 0.5);
+    border-color: rgba($accent-emerald, 0.4);
     .toast-icon { color: $accent-emerald; }
   }
   &.toast-error {
-    border-color: rgba($accent-rose, 0.5);
+    border-color: rgba($accent-rose, 0.4);
     .toast-icon { color: $accent-rose; }
   }
 }
 
 @keyframes slideInToast {
   from {
-    transform: translateY(12px);
+    transform: translateY(8px);
     opacity: 0;
   }
   to {
