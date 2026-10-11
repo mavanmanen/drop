@@ -33,8 +33,8 @@ RUN dotnet publish -c Release -o /app/publish /p:UseAppHost=false
 FROM mcr.microsoft.com/dotnet/aspnet:10.0-alpine AS runtime
 WORKDIR /app
 
-# Install ffmpeg for automatic clip thumbnail generation & duration probing, and curl for healthchecks
-RUN apk add --no-cache ffmpeg curl
+# Install ffmpeg for automatic clip thumbnail generation, duration probing, and web-friendly streaming
+RUN apk add --no-cache ffmpeg
 
 # Create persistent data directories
 RUN mkdir -p /data/ingest /data/clips /data/thumbnails /data/db
@@ -55,6 +55,6 @@ VOLUME ["/data"]
 EXPOSE 8080
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-    CMD curl -f http://localhost:8080/health || exit 1
+    CMD wget -q --spider http://localhost:8080/health || exit 1
 
 ENTRYPOINT ["dotnet", "Drop.Api.dll"]
