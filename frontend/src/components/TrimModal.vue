@@ -393,7 +393,7 @@ onBeforeUnmount(() => {
                 <input
                   v-model.number="startTime"
                   type="number"
-                  step="0.1"
+                  step="any"
                   min="0"
                   :max="endTime - 0.1"
                   class="form-input"
@@ -410,7 +410,7 @@ onBeforeUnmount(() => {
                 <input
                   v-model.number="endTime"
                   type="number"
-                  step="0.1"
+                  step="any"
                   :min="startTime + 0.1"
                   :max="duration"
                   class="form-input"
