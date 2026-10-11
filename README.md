@@ -113,7 +113,13 @@ npm run dev
 ```
 Frontend runs on `http://localhost:5173` with automatic API proxying to `http://localhost:5000`.
 
-### 3. Build Full Single-Binary Package
+### 3. Run Backend Unit & Integration Tests
+
+```bash
+dotnet test
+```
+
+### 4. Build Full Single-Binary Package
 
 ```bash
 # 1. Build frontend into Drop.Api/wwwroot
