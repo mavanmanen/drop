@@ -213,11 +213,12 @@ public static class ClipEndpoints
                 return Results.NotFound(new { error = "Video file missing on disk" });
             }
 
+            var download = httpContext.Request.Query.ContainsKey("download");
             var stream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read);
             return Results.Stream(
                 stream,
                 contentType: clip.ContentType,
-                fileDownloadName: clip.OriginalFileName,
+                fileDownloadName: download ? clip.OriginalFileName : null,
                 enableRangeProcessing: true);
         });
 

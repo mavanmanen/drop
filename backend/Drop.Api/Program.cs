@@ -1,13 +1,23 @@
 using System.Text;
 using Drop.Api.Data;
 using Drop.Api.Endpoints;
+using Drop.Api.Models;
 using Drop.Api.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Http.Features;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Configure forwarded headers from reverse proxies (Nginx, Traefik, Caddy, Cloudflare)
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto | ForwardedHeaders.XForwardedHost;
+    options.KnownIPNetworks.Clear();
+    options.KnownProxies.Clear();
+});
 
 // Configure maximum video upload size (2GB)
 builder.WebHost.ConfigureKestrel(options =>
@@ -85,6 +95,9 @@ builder.Services.AddCors(options =>
 
 var app = builder.Build();
 
+// Respect reverse proxy headers (HTTPS scheme, host, client IP)
+app.UseForwardedHeaders();
+
 // Ensure Database is initialized
 using (var scope = app.Services.CreateScope())
 {
@@ -136,70 +149,110 @@ app.MapGet("/api/system/status", async (
     });
 }).WithTags("System");
 
-// OpenGraph HTML for share bots (Discord, Twitter/X, Facebook, Telegram)
+// Helper for OpenGraph embed rendering
+static bool IsBotUserAgent(string userAgent)
+{
+    var ua = userAgent.ToLowerInvariant();
+    return ua.Contains("discordbot") ||
+           ua.Contains("twitterbot") ||
+           ua.Contains("facebookexternalhit") ||
+           ua.Contains("slackbot") ||
+           ua.Contains("telegrambot") ||
+           ua.Contains("whatsapp") ||
+           ua.Contains("meta-externalagent");
+}
+
+static IResult GenerateOpenGraphHtml(Clip clip, HttpContext context)
+{
+    // Determine canonical scheme and host (respecting X-Forwarded-Proto / X-Forwarded-Host)
+    var scheme = context.Request.Scheme;
+    var host = context.Request.Host.Value;
+    var streamUrl = $"{scheme}://{host}/api/clips/{clip.Id}/stream";
+    var thumbUrl = $"{scheme}://{host}/api/clips/{clip.Id}/thumbnail";
+    var pageUrl = $"{scheme}://{host}/clip/{clip.Id}";
+
+    var title = System.Net.WebUtility.HtmlEncode(clip.Title);
+    var description = System.Net.WebUtility.HtmlEncode(clip.Description ?? "Watch this video clip on drop");
+
+    var html = $$"""
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <title>{{title}} - drop</title>
+        <meta name="description" content="{{description}}">
+        <meta property="og:site_name" content="drop">
+        <meta property="og:type" content="video.other">
+        <meta property="og:title" content="{{title}}">
+        <meta property="og:description" content="{{description}}">
+        <meta property="og:url" content="{{pageUrl}}">
+        <meta property="og:image" content="{{thumbUrl}}">
+        <meta property="og:video" content="{{streamUrl}}">
+        <meta property="og:video:url" content="{{streamUrl}}">
+        <meta property="og:video:secure_url" content="{{streamUrl}}">
+        <meta property="og:video:type" content="{{clip.ContentType}}">
+        <meta property="og:video:width" content="1920">
+        <meta property="og:video:height" content="1080">
+        <meta name="twitter:card" content="player">
+        <meta name="twitter:title" content="{{title}}">
+        <meta name="twitter:description" content="{{description}}">
+        <meta name="twitter:image" content="{{thumbUrl}}">
+        <meta name="twitter:player" content="{{pageUrl}}">
+        <meta name="twitter:player:width" content="1920">
+        <meta name="twitter:player:height" content="1080">
+        <meta name="twitter:player:stream" content="{{streamUrl}}">
+        <meta name="twitter:player:stream:content_type" content="{{clip.ContentType}}">
+    </head>
+    <body>
+        <p>Redirecting to clip...</p>
+        <script>window.location.href = '/clip/{{clip.Id}}';</script>
+    </body>
+    </html>
+    """;
+
+    return Results.Content(html, "text/html");
+}
+
+// Bot preview endpoint for /c/{id}
 app.MapGet("/c/{id}", async (string id, HttpContext context, DropDbContext db, IAuthService authService) =>
 {
-    var userAgent = context.Request.Headers.UserAgent.ToString().ToLowerInvariant();
-    var isBot = userAgent.Contains("discordbot") ||
-                userAgent.Contains("twitterbot") ||
-                userAgent.Contains("facebookexternalhit") ||
-                userAgent.Contains("slackbot") ||
-                userAgent.Contains("telegrambot");
-
+    var userAgent = context.Request.Headers.UserAgent.ToString();
     var clip = await db.Clips.FirstOrDefaultAsync(c => c.Id == id);
     if (clip == null) return Results.NotFound();
 
-    // Private clips cannot be previewed by bots or unauthenticated users
     if (clip.Visibility == "private" && !authService.IsAdmin(context))
     {
         return Results.NotFound();
     }
 
-    if (isBot)
+    if (IsBotUserAgent(userAgent))
     {
-        var scheme = context.Request.Scheme;
-        var host = context.Request.Host.Value;
-        var streamUrl = $"{scheme}://{host}/api/clips/{clip.Id}/stream";
-        var thumbUrl = $"{scheme}://{host}/api/clips/{clip.Id}/thumbnail";
-        var pageUrl = $"{scheme}://{host}/clip/{clip.Id}";
-
-        var html = $$"""
-        <!DOCTYPE html>
-        <html lang="en">
-        <head>
-            <meta charset="utf-8">
-            <title>{{clip.Title}} - drop</title>
-            <meta name="description" content="{{clip.Description ?? "Watch this gaming clip on drop."}}">
-            <meta property="og:site_name" content="drop">
-            <meta property="og:type" content="video.other">
-            <meta property="og:title" content="{{clip.Title}}">
-            <meta property="og:description" content="{{clip.Description ?? "Watch short video game clips on drop"}}">
-            <meta property="og:url" content="{{pageUrl}}">
-            <meta property="og:image" content="{{thumbUrl}}">
-            <meta property="og:video" content="{{streamUrl}}">
-            <meta property="og:video:type" content="{{clip.ContentType}}">
-            <meta property="og:video:width" content="1920">
-            <meta property="og:video:height" content="1080">
-            <meta name="twitter:card" content="player">
-            <meta name="twitter:title" content="{{clip.Title}}">
-            <meta name="twitter:description" content="{{clip.Description ?? "Watch this video game clip on drop."}}">
-            <meta name="twitter:image" content="{{thumbUrl}}">
-            <meta name="twitter:player" content="{{pageUrl}}">
-            <meta name="twitter:player:width" content="1920">
-            <meta name="twitter:player:height" content="1080">
-        </head>
-        <body>
-            <p>Redirecting to clip...</p>
-            <script>window.location.href = '/clip/{{clip.Id}}';</script>
-        </body>
-        </html>
-        """;
-
-        return Results.Content(html, "text/html");
+        return GenerateOpenGraphHtml(clip, context);
     }
 
-    // Default: redirect to the SPA clip route
+    // Default for real users: redirect to full SPA route
     return Results.Redirect($"/clip/{id}");
+});
+
+// Bot preview endpoint for /clip/{id} (standard SPA route, but renders OpenGraph if accessed by scrapers)
+app.MapGet("/clip/{id}", async (string id, HttpContext context, DropDbContext db, IAuthService authService) =>
+{
+    var userAgent = context.Request.Headers.UserAgent.ToString();
+    if (IsBotUserAgent(userAgent))
+    {
+        var clip = await db.Clips.FirstOrDefaultAsync(c => c.Id == id);
+        if (clip == null) return Results.NotFound();
+
+        if (clip.Visibility == "private" && !authService.IsAdmin(context))
+        {
+            return Results.NotFound();
+        }
+
+        return GenerateOpenGraphHtml(clip, context);
+    }
+
+    // Normal browser users fall through to SPA index.html
+    return Results.File(Path.Combine(app.Environment.WebRootPath, "index.html"), "text/html");
 });
 
 // Serve frontend static files if present (wwwroot)
