@@ -93,17 +93,10 @@ public static class DatabaseConfigurator
         }
         else
         {
-            var configuredDataDir = configuration["DROP_DATA_DIR"];
-            string baseDataDir = !string.IsNullOrWhiteSpace(configuredDataDir)
-                ? (Path.IsPathRooted(configuredDataDir) ? configuredDataDir : Path.GetFullPath(Path.Combine(environment.ContentRootPath, configuredDataDir)))
-                : Path.Combine(AppContext.BaseDirectory, "data");
-
-            baseDataDir = Path.GetFullPath(baseDataDir);
+            var baseDataDir = AppDataPaths.ResolveBaseDataDirectory(environment, configuration);
             Directory.CreateDirectory(baseDataDir);
 
-            var dbPath = configuration["DROP_DB_PATH"]
-                         ?? Path.Combine(baseDataDir, "db", "drop.db");
-            dbPath = Path.GetFullPath(dbPath);
+            var dbPath = Path.GetFullPath(AppDataPaths.GetDatabaseFilePath(baseDataDir));
 
             var dbDirectory = Path.GetDirectoryName(dbPath);
             if (!string.IsNullOrEmpty(dbDirectory) && !Directory.Exists(dbDirectory))

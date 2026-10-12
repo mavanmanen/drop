@@ -17,13 +17,8 @@ services:
       - DROP_ADMIN_PASSWORD=${DROP_ADMIN_PASSWORD:-change-me-promptly}
       # Optional custom JWT secret (recommended for production)
       - DROP_JWT_SECRET=${DROP_JWT_SECRET:-drop_super_secret_gaming_clips_key_2026_dev_env_only!}
-      # Storage and directory paths inside container
-      - DROP_DATA_DIR=${DROP_DATA_DIR:-/data}
-      - DROP_INGEST_PATH=${DROP_INGEST_PATH:-/data/ingest}
-      - DROP_STORAGE_PATH=${DROP_STORAGE_PATH:-/data/clips}
       # Database configuration: 'sqlite' (default) or 'postgres'
       - DROP_DB_PROVIDER=${DROP_DB_PROVIDER:-sqlite}
-      - DROP_DB_PATH=${DROP_DB_PATH:-/data/db/drop.db}
       # Default visibility for automatically ingested clips (public, unlisted, or private)
       - DROP_INGEST_DEFAULT_VISIBILITY=${DROP_INGEST_DEFAULT_VISIBILITY:-public}
       # Gemini AI Video Analysis (optional)

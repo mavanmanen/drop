@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Security.Cryptography;
+using Drop.Api.Data;
 
 namespace Drop.Api.Services;
 
@@ -41,18 +42,18 @@ public class MediaStorageService : IMediaStorageService
     public string ThumbnailsDirectory => _thumbnailsDirectory;
 
     public MediaStorageService(IConfiguration configuration, IWebHostEnvironment env, ILogger<MediaStorageService> logger)
+        : this(AppDataPaths.ResolveBaseDataDirectory(env, configuration), logger)
+    {
+    }
+
+    public MediaStorageService(string baseDataDir, ILogger<MediaStorageService> logger)
     {
         _logger = logger;
 
-        var configured = configuration["DROP_DATA_DIR"];
-        string baseDataDir = !string.IsNullOrWhiteSpace(configured)
-            ? (Path.IsPathRooted(configured) ? configured : Path.GetFullPath(Path.Combine(env.ContentRootPath, configured)))
-            : Path.Combine(AppContext.BaseDirectory, "data");
-
         baseDataDir = Path.GetFullPath(baseDataDir);
-        _ingestDirectory = Path.GetFullPath(configuration["DROP_INGEST_PATH"] ?? Path.Combine(baseDataDir, "ingest"));
-        _clipsDirectory = Path.GetFullPath(configuration["DROP_STORAGE_PATH"] ?? Path.Combine(baseDataDir, "clips"));
-        _thumbnailsDirectory = Path.GetFullPath(Path.Combine(baseDataDir, "thumbnails"));
+        _ingestDirectory = Path.GetFullPath(AppDataPaths.GetIngestDirectory(baseDataDir));
+        _clipsDirectory = Path.GetFullPath(AppDataPaths.GetClipsDirectory(baseDataDir));
+        _thumbnailsDirectory = Path.GetFullPath(AppDataPaths.GetThumbnailsDirectory(baseDataDir));
 
         Directory.CreateDirectory(_ingestDirectory);
         Directory.CreateDirectory(_clipsDirectory);

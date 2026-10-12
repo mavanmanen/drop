@@ -18,7 +18,7 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
         {
             config.AddInMemoryCollection(new Dictionary<string, string?>
             {
-                { "DROP_DATA_DIR", TempDataDir },
+                { "TEST_DATA_DIR", TempDataDir },
                 { "DROP_ADMIN_USERNAME", "admin" },
                 { "DROP_ADMIN_PASSWORD", "testpass123" },
                 { "DROP_INGEST_DEFAULT_VISIBILITY", "public" }

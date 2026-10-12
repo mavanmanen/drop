@@ -1,7 +1,4 @@
 using Drop.Api.Services;
-using Microsoft.AspNetCore.Hosting;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
 
@@ -17,15 +14,7 @@ public class MediaStorageServiceTests : IDisposable
         _tempDir = Path.Combine(Path.GetTempPath(), "drop_media_tests_" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(_tempDir);
 
-        var config = new ConfigurationBuilder()
-            .AddInMemoryCollection(new Dictionary<string, string?>
-            {
-                { "DROP_DATA_DIR", _tempDir }
-            })
-            .Build();
-
-        var fakeEnv = new FakeWebHostEnvironment { ContentRootPath = _tempDir };
-        _service = new MediaStorageService(config, fakeEnv, NullLogger<MediaStorageService>.Instance);
+        _service = new MediaStorageService(_tempDir, NullLogger<MediaStorageService>.Instance);
     }
 
     public void Dispose()
@@ -110,15 +99,5 @@ public class MediaStorageServiceTests : IDisposable
     {
         await Assert.ThrowsAsync<FileNotFoundException>(() =>
             _service.TrimVideoAsync("nonexistent_source.mp4", "newclip1", 0.0, 5.0));
-    }
-
-    private class FakeWebHostEnvironment : IWebHostEnvironment
-    {
-        public string WebRootPath { get; set; } = string.Empty;
-        public IFileProvider WebRootFileProvider { get; set; } = new NullFileProvider();
-        public string EnvironmentName { get; set; } = "Testing";
-        public string ApplicationName { get; set; } = "Drop.Tests";
-        public string ContentRootPath { get; set; } = string.Empty;
-        public IFileProvider ContentRootFileProvider { get; set; } = new NullFileProvider();
     }
 }

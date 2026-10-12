@@ -95,10 +95,7 @@ cp .env.example .env
 | `DROP_ADMIN_USERNAME` | `admin` | Username for single admin account |
 | `DROP_ADMIN_PASSWORD` | `change-me-promptly` | Password for single admin account |
 | `DROP_JWT_SECRET` | *(auto-generated)* | 32+ character key for JWT token signing |
-| `DROP_INGEST_PATH` | `/data/ingest` | Path to folder monitored for new clips |
-| `DROP_STORAGE_PATH` | `/data/clips` | Path where permanent video files are kept |
 | `DROP_DB_PROVIDER` | `sqlite` | Database engine: `sqlite` or `postgres` |
-| `DROP_DB_PATH` | `/data/db/drop.db` | SQLite database file location (when using SQLite) |
 | `DROP_DB_CONNECTION_STRING` | *(optional)* | Full connection string or URL for PostgreSQL (`postgres://...` or `Host=...`) |
 | `DROP_POSTGRES_HOST` | `localhost` | PostgreSQL host (when using Postgres) |
 | `DROP_POSTGRES_PORT` | `5432` | PostgreSQL port (when using Postgres) |
@@ -107,7 +104,7 @@ cp .env.example .env
 | `DROP_POSTGRES_PASSWORD` | `postgres` | PostgreSQL password |
 | `DROP_INGEST_DEFAULT_VISIBILITY` | `public` | Default visibility for ingested clips (`public`, `unlisted`, `private`) |
 | `GEMINI_API_KEY` | *(optional)* | Google Gemini API key for on-demand AI video analysis |
-| `GEMINI_MODEL` | `gemini-3.8-flash` | Optional fallback Gemini model (models can also be selected directly in the UI during analysis) |
+| `GEMINI_MODEL` | `gemini-3.5-flash-lite` | Optional fallback Gemini model (models can also be selected directly in the UI during analysis) |
 
 ### 5. Running with PostgreSQL
 

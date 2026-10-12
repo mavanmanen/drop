@@ -28,21 +28,15 @@ services:
       # JWT Secret key: Must be at least 32 characters for production security
       - DROP_JWT_SECRET=${DROP_JWT_SECRET:-replace-with-a-random-32-char-secret-string}
 
-      # Internal container storage paths
-      - DROP_DATA_DIR=${DROP_DATA_DIR:-/data}
-      - DROP_INGEST_PATH=${DROP_INGEST_PATH:-/data/ingest}
-      - DROP_STORAGE_PATH=${DROP_STORAGE_PATH:-/data/clips}
-
       # Database provider: 'sqlite' (default) or 'postgres'
       - DROP_DB_PROVIDER=${DROP_DB_PROVIDER:-sqlite}
-      - DROP_DB_PATH=${DROP_DB_PATH:-/data/db/drop.db}
 
       # Default visibility for automatically ingested clips: 'public', 'unlisted', or 'private'
       - DROP_INGEST_DEFAULT_VISIBILITY=${DROP_INGEST_DEFAULT_VISIBILITY:-public}
 
       # Gemini AI Video Analysis (optional)
       - GEMINI_API_KEY=${GEMINI_API_KEY:-}
-      - GEMINI_MODEL=${GEMINI_MODEL:-gemini-3.8-flash}
+      - GEMINI_MODEL=${GEMINI_MODEL:-gemini-3.5-flash-lite}
 
     volumes:
       # Ingest folder: Drop gaming clips here (OBS, Medal.tv, ShadowPlay) to auto-import
@@ -55,7 +49,7 @@ services:
       - ./data/db:/data/db
 
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:8080/health || exit 1"]
+      test: [ "CMD-SHELL", "wget -q --spider http://localhost:8080/health || exit 1" ]
       interval: 30s
       timeout: 5s
       retries: 3

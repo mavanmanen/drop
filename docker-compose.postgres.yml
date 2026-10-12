@@ -24,11 +24,6 @@ services:
       - DROP_ADMIN_PASSWORD=${DROP_ADMIN_PASSWORD:-change-me-promptly}
       - DROP_JWT_SECRET=${DROP_JWT_SECRET:-drop_super_secret_gaming_clips_key_2026_dev_env_only!}
 
-      # Storage directories inside container
-      - DROP_DATA_DIR=${DROP_DATA_DIR:-/data}
-      - DROP_INGEST_PATH=${DROP_INGEST_PATH:-/data/ingest}
-      - DROP_STORAGE_PATH=${DROP_STORAGE_PATH:-/data/clips}
-
       # Database Configuration: PostgreSQL
       - DROP_DB_PROVIDER=postgres
       - DROP_POSTGRES_HOST=${DROP_POSTGRES_HOST:-postgres}
@@ -42,7 +37,7 @@ services:
 
       # Gemini AI Video Analysis (optional)
       - GEMINI_API_KEY=${GEMINI_API_KEY:-}
-      - GEMINI_MODEL=${GEMINI_MODEL:-gemini-3.8-flash}
+      - GEMINI_MODEL=${GEMINI_MODEL:-gemini-3.5-flash-lite}
     develop:
       watch:
         # Rebuild container when backend source code or project file changes
@@ -72,7 +67,7 @@ services:
       postgres:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:8080/health || exit 1"]
+      test: [ "CMD-SHELL", "wget -q --spider http://localhost:8080/health || exit 1" ]
       interval: 30s
       timeout: 5s
       retries: 3
@@ -89,7 +84,7 @@ services:
     volumes:
       - ./data/postgres:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U drop -d drop || exit 1"]
+      test: [ "CMD-SHELL", "pg_isready -U drop -d drop || exit 1" ]
       interval: 10s
       timeout: 5s
       retries: 5

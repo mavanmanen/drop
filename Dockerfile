@@ -44,10 +44,6 @@ COPY --from=backend-builder /app/publish .
 # Environment Configuration
 ENV ASPNETCORE_URLS=http://+:8080 \
     ASPNETCORE_ENVIRONMENT=Production \
-    DROP_DATA_DIR=/data \
-    DROP_INGEST_PATH=/data/ingest \
-    DROP_STORAGE_PATH=/data/clips \
-    DROP_DB_PATH=/data/db/drop.db \
     DROP_ADMIN_USERNAME=admin \
     DROP_ADMIN_PASSWORD=change-me-promptly
 
