@@ -125,41 +125,62 @@ public static class DatabaseConfigurator
 
         if (db.Database.IsSqlite())
         {
-            try
-            {
-                await db.Database.ExecuteSqlRawAsync("ALTER TABLE Clips ADD COLUMN Visibility TEXT NOT NULL DEFAULT 'public';");
-            }
-            catch { /* Column already exists */ }
+            var clipsColumns = await GetSqliteColumnNamesAsync(db, "Clips");
+            var collectionsColumns = await GetSqliteColumnNamesAsync(db, "Collections");
 
-            try
+            if (!clipsColumns.Contains("Visibility"))
             {
-                await db.Database.ExecuteSqlRawAsync("ALTER TABLE Collections ADD COLUMN Visibility TEXT NOT NULL DEFAULT 'public';");
+                try
+                {
+                    await db.Database.ExecuteSqlRawAsync("ALTER TABLE Clips ADD COLUMN Visibility TEXT NOT NULL DEFAULT 'public';");
+                }
+                catch { /* Column already exists */ }
             }
-            catch { /* Column already exists */ }
 
-            try
+            if (!collectionsColumns.Contains("Visibility"))
             {
-                await db.Database.ExecuteSqlRawAsync("ALTER TABLE Clips ADD COLUMN ParentClipId TEXT NULL;");
+                try
+                {
+                    await db.Database.ExecuteSqlRawAsync("ALTER TABLE Collections ADD COLUMN Visibility TEXT NOT NULL DEFAULT 'public';");
+                }
+                catch { /* Column already exists */ }
             }
-            catch { /* Column already exists */ }
 
-            try
+            if (!clipsColumns.Contains("ParentClipId"))
             {
-                await db.Database.ExecuteSqlRawAsync("ALTER TABLE Clips ADD COLUMN Tags TEXT NULL;");
+                try
+                {
+                    await db.Database.ExecuteSqlRawAsync("ALTER TABLE Clips ADD COLUMN ParentClipId TEXT NULL;");
+                }
+                catch { /* Column already exists */ }
             }
-            catch { /* Column already exists */ }
 
-            try
+            if (!clipsColumns.Contains("Tags"))
             {
-                await db.Database.ExecuteSqlRawAsync("ALTER TABLE Clips ADD COLUMN AiAnalysisJson TEXT NULL;");
+                try
+                {
+                    await db.Database.ExecuteSqlRawAsync("ALTER TABLE Clips ADD COLUMN Tags TEXT NULL;");
+                }
+                catch { /* Column already exists */ }
             }
-            catch { /* Column already exists */ }
 
-            try
+            if (!clipsColumns.Contains("AiAnalysisJson"))
             {
-                await db.Database.ExecuteSqlRawAsync("ALTER TABLE Clips ADD COLUMN LikesCount INTEGER NOT NULL DEFAULT 0;");
+                try
+                {
+                    await db.Database.ExecuteSqlRawAsync("ALTER TABLE Clips ADD COLUMN AiAnalysisJson TEXT NULL;");
+                }
+                catch { /* Column already exists */ }
             }
-            catch { /* Column already exists */ }
+
+            if (!clipsColumns.Contains("LikesCount"))
+            {
+                try
+                {
+                    await db.Database.ExecuteSqlRawAsync("ALTER TABLE Clips ADD COLUMN LikesCount INTEGER NOT NULL DEFAULT 0;");
+                }
+                catch { /* Column already exists */ }
+            }
         }
         else if (db.Database.IsNpgsql())
         {
@@ -200,4 +221,44 @@ public static class DatabaseConfigurator
             catch { /* Column already exists */ }
         }
     }
+
+    private static async Task<HashSet<string>> GetSqliteColumnNamesAsync(DropDbContext db, string tableName)
+    {
+        var columns = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var connection = db.Database.GetDbConnection();
+        var wasClosed = connection.State == System.Data.ConnectionState.Closed;
+        if (wasClosed)
+        {
+            await connection.OpenAsync();
+        }
+
+        try
+        {
+            using var command = connection.CreateCommand();
+            command.CommandText = $"PRAGMA table_info('{tableName}');";
+            using var reader = await command.ExecuteReaderAsync();
+            while (await reader.ReadAsync())
+            {
+                // PRAGMA table_info returns: cid, name, type, notnull, dflt_value, pk
+                if (!reader.IsDBNull(1))
+                {
+                    columns.Add(reader.GetString(1));
+                }
+            }
+        }
+        catch
+        {
+            // If table doesn't exist yet or query fails, return empty set
+        }
+        finally
+        {
+            if (wasClosed)
+            {
+                await connection.CloseAsync();
+            }
+        }
+
+        return columns;
+    }
 }
+

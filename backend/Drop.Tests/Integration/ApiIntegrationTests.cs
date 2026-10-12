@@ -49,6 +49,16 @@ public class ApiIntegrationTests : IClassFixture<CustomWebApplicationFactory>
     }
 
     [Fact]
+    public async Task InitializeDatabase_IsIdempotent_AndDoesNotThrowOnExistingColumns()
+    {
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<DropDbContext>();
+
+        var exception = await Record.ExceptionAsync(() => DatabaseConfigurator.InitializeDatabaseAsync(db));
+        Assert.Null(exception);
+    }
+
+    [Fact]
     public async Task HealthCheck_ReturnsHealthy()
     {
         var client = CreateAnonymousClient();
