@@ -20,6 +20,8 @@ builder.Services.AddDataProtection()
     .PersistKeysToFileSystem(new DirectoryInfo(keysDir))
     .SetApplicationName("Drop");
 
+builder.Logging.AddFilter("Microsoft.AspNetCore.DataProtection", LogLevel.Error);
+
 // Configure forwarded headers from reverse proxies (Nginx, Traefik, Caddy, Cloudflare)
 builder.Services.Configure<ForwardedHeadersOptions>(options =>
 {
