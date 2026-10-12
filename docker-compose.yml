@@ -28,7 +28,7 @@ services:
       - DROP_INGEST_DEFAULT_VISIBILITY=${DROP_INGEST_DEFAULT_VISIBILITY:-public}
       # Gemini AI Video Analysis (optional)
       - GEMINI_API_KEY=${GEMINI_API_KEY:-}
-      - GEMINI_MODEL=${GEMINI_MODEL:-gemini-3.8-flash}
+      - GEMINI_MODEL=${GEMINI_MODEL:-gemini-3.5-flash-lite}
     develop:
       watch:
         # Rebuild container when backend source code or project file changes

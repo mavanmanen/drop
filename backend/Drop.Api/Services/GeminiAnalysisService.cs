@@ -101,7 +101,7 @@ public class GeminiAnalysisService : IGeminiAnalysisService
         _apiKey = configuration["GEMINI_API_KEY"]
                   ?? configuration["DROP_GEMINI_API_KEY"]
                   ?? Environment.GetEnvironmentVariable("GEMINI_API_KEY");
-        _defaultModel = configuration["GEMINI_MODEL"] ?? "gemini-3.8-flash";
+        _defaultModel = configuration["GEMINI_MODEL"] ?? "gemini-3.5-flash-lite";
 
         if (!IsConfigured)
         {

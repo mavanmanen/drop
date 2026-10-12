@@ -34,11 +34,11 @@ const emit = defineEmits<{
 const { success, error: toastError } = useToast();
 
 const selectedMode = ref<'both' | 'tags' | 'subclips'>('both');
-const selectedModel = ref<string>('gemini-3.8-flash');
+const selectedModel = ref<string>('gemini-3.5-flash-lite');
 const availableModels = ref<string[]>([
+  'gemini-3.5-flash-lite',
   'gemini-3.8-flash',
   'gemini-3.8-pro',
-  'gemini-3.5-flash-lite',
   'gemini-3.1-flash-lite',
   'gemini-2.5-flash',
   'gemini-2.5-flash-lite',
