@@ -89,7 +89,8 @@ public static class DatabaseConfigurator
             AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", true);
             var connectionString = BuildPostgresConnectionString(configuration);
             services.AddDbContext<DropDbContext>(options =>
-                options.UseNpgsql(connectionString));
+                options.UseNpgsql(connectionString, npgsql =>
+                    npgsql.UseQuerySplittingBehavior(QuerySplittingBehavior.SplitQuery)));
         }
         else
         {
@@ -115,7 +116,8 @@ public static class DatabaseConfigurator
 
             var connectionString = $"Data Source={dbPath}";
             services.AddDbContext<DropDbContext>(options =>
-                options.UseSqlite(connectionString));
+                options.UseSqlite(connectionString, sqlite =>
+                    sqlite.UseQuerySplittingBehavior(QuerySplittingBehavior.SplitQuery)));
         }
     }
 

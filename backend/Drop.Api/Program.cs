@@ -4,12 +4,21 @@ using Drop.Api.Endpoints;
 using Drop.Api.Models;
 using Drop.Api.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Configure Data Protection key persistence (persisted in /data/keys so keys survive container restart and suppress ephemeral warnings)
+var baseDataDir = AppDataPaths.ResolveBaseDataDirectory(builder.Environment, builder.Configuration);
+var keysDir = AppDataPaths.GetDataProtectionKeysDirectory(baseDataDir);
+Directory.CreateDirectory(keysDir);
+builder.Services.AddDataProtection()
+    .PersistKeysToFileSystem(new DirectoryInfo(keysDir))
+    .SetApplicationName("Drop");
 
 // Configure forwarded headers from reverse proxies (Nginx, Traefik, Caddy, Cloudflare)
 builder.Services.Configure<ForwardedHeadersOptions>(options =>

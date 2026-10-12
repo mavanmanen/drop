@@ -51,4 +51,6 @@ public static class AppDataPaths
     public static string GetClipsDirectory(string baseDataDir) => Path.Combine(baseDataDir, "clips");
     public static string GetThumbnailsDirectory(string baseDataDir) => Path.Combine(baseDataDir, "thumbnails");
     public static string GetDatabaseFilePath(string baseDataDir) => Path.Combine(baseDataDir, "db", "drop.db");
+    public static string GetDataProtectionKeysDirectory(string baseDataDir) => Path.Combine(baseDataDir, "keys");
 }
+
