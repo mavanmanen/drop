@@ -22,6 +22,7 @@ public interface IGeminiAnalysisService
         string mimeType,
         double? durationSeconds,
         string promptMode, // "tags", "subclips", or "both"
+        string? originalFileName = null,
         string? model = null,
         CancellationToken cancellationToken = default);
 }

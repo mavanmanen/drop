@@ -210,11 +210,11 @@ class ApiClient {
     });
   }
 
-  async analyzeClipAi(id: string, mode: 'tags' | 'subclips' | 'both', model?: string): Promise<AiClipAnalysisResult> {
+  async analyzeClipAi(id: string, mode: 'tags' | 'subclips' | 'both', model?: string, context?: string): Promise<AiClipAnalysisResult> {
     return this.request<AiClipAnalysisResult>(`/clips/${id}/ai-analyze`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ mode, model }),
+      body: JSON.stringify({ mode, model, context }),
     });
   }
 

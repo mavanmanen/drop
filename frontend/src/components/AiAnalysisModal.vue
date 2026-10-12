@@ -110,7 +110,12 @@ async function runAnalysis() {
   errorMessage.value = null;
 
   try {
-    const res = await api.analyzeClipAi(props.clip.id, selectedMode.value, selectedModel.value);
+    const res = await api.analyzeClipAi(
+      props.clip.id,
+      selectedMode.value,
+      selectedModel.value,
+      props.clip.originalFileName
+    );
     analysisResult.value = res;
     hasLoadedSavedResult.value = false;
     emit('analysisUpdated', res);
@@ -242,6 +247,11 @@ onBeforeUnmount(() => {
                 </select>
               </div>
             </div>
+          </div>
+
+          <div v-if="props.clip.originalFileName" class="controls-context-row">
+            <span class="context-label">Filename context:</span>
+            <code class="context-filename" :title="props.clip.originalFileName">{{ props.clip.originalFileName }}</code>
           </div>
 
           <div class="controls-action-row">
@@ -621,6 +631,32 @@ onBeforeUnmount(() => {
           box-shadow: 0 0 0 2px rgba(0, 242, 254, 0.2);
         }
       }
+    }
+  }
+
+  .controls-context-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding-top: 0.5rem;
+    font-size: 0.78rem;
+
+    .context-label {
+      color: $text-muted;
+      font-weight: 500;
+    }
+
+    .context-filename {
+      color: $accent-cyan;
+      background: rgba(0, 242, 254, 0.08);
+      border: 1px solid rgba(0, 242, 254, 0.2);
+      padding: 0.15rem 0.45rem;
+      border-radius: $radius-sm;
+      font-size: 0.75rem;
+      max-width: 400px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
     }
   }
 

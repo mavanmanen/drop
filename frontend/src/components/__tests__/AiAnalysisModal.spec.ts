@@ -92,10 +92,10 @@ describe('AiAnalysisModal.vue', () => {
       },
     });
 
+    expect(wrapper.text()).toContain('clip.mp4');
     const runBtn = wrapper.find('.btn-run-ai');
     await runBtn.trigger('click');
-
-    expect(api.analyzeClipAi).toHaveBeenCalledWith('testclip1', 'both', 'gemini-3.5-flash-lite');
+    expect(api.analyzeClipAi).toHaveBeenCalledWith('testclip1', 'both', 'gemini-3.5-flash-lite', 'clip.mp4');
 
     // Wait for promise resolution
     await wrapper.vm.$nextTick();

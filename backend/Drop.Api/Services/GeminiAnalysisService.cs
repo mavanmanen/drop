@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
@@ -118,6 +119,7 @@ public class GeminiAnalysisService : IGeminiAnalysisService
         string mimeType,
         double? durationSeconds,
         string promptMode,
+        string? originalFileName = null,
         string? model = null,
         CancellationToken cancellationToken = default)
     {
@@ -143,8 +145,9 @@ public class GeminiAnalysisService : IGeminiAnalysisService
 
         try
         {
-            _logger.LogInformation("Uploading video '{File}' to Gemini Files API...", Path.GetFileName(videoFilePath));
-            uploadedFile = await UploadVideoFileAsync(videoFilePath, mimeType, cancellationToken);
+            var logFileName = !string.IsNullOrWhiteSpace(originalFileName) ? originalFileName : Path.GetFileName(videoFilePath);
+            _logger.LogInformation("Uploading video '{File}' to Gemini Files API...", logFileName);
+            uploadedFile = await UploadVideoFileAsync(videoFilePath, mimeType, originalFileName, cancellationToken);
 
             var fileName = uploadedFile.Name ?? throw new InvalidOperationException("Gemini upload failed to return a file name.");
 
@@ -172,8 +175,9 @@ public class GeminiAnalysisService : IGeminiAnalysisService
                 attempts++;
             }
 
-            var promptText = BuildPrompt(mode, durationSeconds);
-            _logger.LogInformation("Sending video analysis request to Gemini model {Model} (mode: {Mode})...", targetModel, mode);
+            var promptText = BuildPrompt(mode, durationSeconds, originalFileName);
+            _logger.LogInformation("Sending video analysis request to Gemini model {Model} (mode: {Mode}, filename context: {Filename})...",
+                targetModel, mode, originalFileName ?? "(none)");
 
             var rawJson = await GenerateContentAsync(targetModel, uploadedFile.Uri!, uploadedFile.MimeType ?? mimeType, promptText, cancellationToken);
 
@@ -196,12 +200,12 @@ public class GeminiAnalysisService : IGeminiAnalysisService
         }
     }
 
-    private async Task<GeminiFileRef> UploadVideoFileAsync(string filePath, string mimeType, CancellationToken ct)
+    private async Task<GeminiFileRef> UploadVideoFileAsync(string filePath, string mimeType, string? displayName, CancellationToken ct)
     {
         // 1. Resumable / Initial upload request to https://generativelanguage.googleapis.com/upload/v1beta/files
         var uploadUri = $"https://generativelanguage.googleapis.com/upload/v1beta/files?key={_apiKey}";
         var fileInfo = new FileInfo(filePath);
-        var fileName = Path.GetFileName(filePath);
+        var uploadDisplayName = !string.IsNullOrWhiteSpace(displayName) ? displayName : Path.GetFileName(filePath);
 
         using var initReq = new HttpRequestMessage(HttpMethod.Post, uploadUri);
         initReq.Headers.Add("X-Goog-Upload-Protocol", "resumable");
@@ -209,7 +213,7 @@ public class GeminiAnalysisService : IGeminiAnalysisService
         initReq.Headers.Add("X-Goog-Upload-Header-Content-Length", fileInfo.Length.ToString());
         initReq.Headers.Add("X-Goog-Upload-Header-Content-Type", mimeType);
 
-        var metadataJson = $"{{\"file\": {{\"display_name\": {JsonSerializer.Serialize(fileName)}}}}}";
+        var metadataJson = $"{{\"file\": {{\"display_name\": {JsonSerializer.Serialize(uploadDisplayName)}}}}}";
         initReq.Content = new StringContent(metadataJson, Encoding.UTF8, "application/json");
 
         using var initResp = await _httpClient.SendAsync(initReq, ct);
@@ -325,16 +329,25 @@ public class GeminiAnalysisService : IGeminiAnalysisService
         // Best-effort cleanup
     }
 
-    private static string BuildPrompt(string mode, double? durationSeconds)
+    public static string BuildPrompt(string mode, double? durationSeconds, string? originalFileName = null)
     {
-        var durationInfo = durationSeconds.HasValue
-            ? $"The clip has a duration of approximately {durationSeconds.Value:F1} seconds."
-            : "";
+        var contextBuilder = new StringBuilder();
+        if (durationSeconds.HasValue)
+        {
+            contextBuilder.Append($"The clip has a duration of approximately {durationSeconds.Value.ToString("F1", CultureInfo.InvariantCulture)} seconds. ");
+        }
+
+        if (!string.IsNullOrWhiteSpace(originalFileName))
+        {
+            contextBuilder.Append($"Original recording filename: \"{originalFileName.Trim()}\". Note: The recording filename often contains the game title, map name, or recording context; use this context to accurately recognize the game and generate related tags. ");
+        }
+
+        var contextInfo = contextBuilder.ToString().Trim();
 
         return mode switch
         {
-            "tags" => $@"Analyze this video game recording. {durationInfo}
-Task: Generate between 3 to 8 concise, relevant gaming tags that describe the game title, gameplay moments (e.g. clutch, ace, fail, snipe, win), hero/agent/weapon, or game mode.
+            "tags" => $@"Analyze this video game recording. {contextInfo}
+Task: Generate between 3 to 8 concise, relevant gaming tags that describe the game title, gameplay moments (e.g. clutch, ace, fail, snipe, win), hero/agent/weapon, or game mode. Use the filename context if available to accurately identify the specific game and its terminology.
 Format your output as a valid JSON object matching:
 {{
   ""tags"": [""tag1"", ""tag2""],
@@ -342,7 +355,7 @@ Format your output as a valid JSON object matching:
   ""summary"": ""brief summary""
 }}",
 
-            "subclips" => $@"Analyze this video game recording. {durationInfo}
+            "subclips" => $@"Analyze this video game recording. {contextInfo}
 Task: Identify the most exciting, funny, or noteworthy highlight moments and suggest short sub-clips to cut from it.
 Each suggested sub-clip must have an exciting title, brief description, startSeconds, and endSeconds strictly within the video duration boundaries.
 Keep cut moments focused (typically between 5 and 30 seconds long).
@@ -355,9 +368,9 @@ Format your output as a valid JSON object matching:
   ""summary"": ""brief summary""
 }}",
 
-            _ => $@"Analyze this video game recording. {durationInfo}
+            _ => $@"Analyze this video game recording. {contextInfo}
 Task:
-1. Generate between 3 to 8 concise, relevant gaming tags (game title, moment type like clutch/funny/ace, character/weapon).
+1. Generate between 3 to 8 concise, relevant gaming tags (game title, moment type like clutch/funny/ace, character/weapon). Use the filename context if available to accurately identify the specific game and its terminology.
 2. Identify the most exciting or noteworthy highlight moments and suggest short sub-clips to cut from it with accurate startSeconds and endSeconds.
 3. Provide a one-sentence summary of the clip.
 Format your output as a valid JSON object matching:

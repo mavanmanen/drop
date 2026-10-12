@@ -49,7 +49,7 @@ public static class ClipEndpoints
         string? CollectionId,
         List<string>? Tags
     );
-    public record ClipAnalyzeAiRequest(string Mode, string? Model = null); // "tags", "subclips", "both"
+    public record ClipAnalyzeAiRequest(string Mode, string? Model = null, string? Context = null); // "tags", "subclips", "both"
     public record ClipListResponse(List<ClipDto> Items, int TotalCount, int Page, int PageSize);
 
     public static string NormalizeVisibility(string? v)
@@ -501,11 +501,16 @@ public static class ClipEndpoints
 
             try
             {
+                var contextFileName = !string.IsNullOrWhiteSpace(req.Context)
+                    ? req.Context.Trim()
+                    : clip.OriginalFileName;
+
                 var result = await geminiService.AnalyzeClipAsync(
                     videoFilePath: filePath,
                     mimeType: clip.ContentType,
                     durationSeconds: clip.DurationSeconds,
                     promptMode: req.Mode,
+                    originalFileName: contextFileName,
                     model: req.Model,
                     cancellationToken: cancellationToken);
 
