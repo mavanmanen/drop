@@ -228,25 +228,11 @@ watch(
 }
 
 .hero-strip {
-  background: linear-gradient(135deg, rgba(18, 23, 35, 0.8) 0%, rgba(13, 16, 24, 0.9) 100%);
+  background: $bg-surface;
   border: 1px solid $border-subtle;
-  border-radius: $radius-xl;
-  padding: 1.75rem 2rem;
+  border-radius: $radius-lg;
+  padding: 1.5rem 1.75rem;
   margin-bottom: 1.5rem;
-  box-shadow: $shadow-card;
-  position: relative;
-  overflow: hidden;
-
-  &::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    right: 0;
-    width: 300px;
-    height: 100%;
-    background: radial-gradient(circle at top right, rgba(0, 242, 254, 0.12), transparent 70%);
-    pointer-events: none;
-  }
 
   .hero-content {
     display: flex;
@@ -254,43 +240,39 @@ watch(
     justify-content: space-between;
     flex-wrap: wrap;
     gap: 1.25rem;
-    position: relative;
-    z-index: 1;
 
     .hero-heading {
       h1 {
-        font-size: 1.75rem;
-        font-weight: 800;
-        letter-spacing: -0.03em;
-        background: linear-gradient(135deg, #ffffff 40%, #cbd5e1 100%);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
+        font-size: 1.4rem;
+        font-weight: 700;
+        letter-spacing: -0.02em;
+        color: $text-primary;
       }
 
       p {
-        color: $text-secondary;
-        font-size: 0.92rem;
-        margin-top: 0.25rem;
+        color: $text-muted;
+        font-size: 0.875rem;
+        margin-top: 0.2rem;
       }
     }
 
     .quick-stats {
       display: flex;
-      gap: 0.75rem;
+      gap: 0.5rem;
 
       .stat-pill {
         display: flex;
         align-items: center;
-        gap: 0.45rem;
-        padding: 0.45rem 0.85rem;
-        background: rgba(255, 255, 255, 0.05);
+        gap: 0.4rem;
+        padding: 0.3rem 0.65rem;
+        background: $bg-surface-elevated;
         border: 1px solid $border-subtle;
-        border-radius: 20px;
-        font-size: 0.85rem;
+        border-radius: $radius-sm;
+        font-size: 0.8rem;
         color: $text-secondary;
 
         .stat-icon {
-          color: $accent-cyan;
+          color: $text-muted;
         }
 
         strong {
@@ -311,24 +293,24 @@ watch(
   .filter-chips {
     display: flex;
     align-items: center;
-    gap: 0.5rem;
+    gap: 0.35rem;
     overflow-x: auto;
-    padding-bottom: 0.35rem;
+    padding-bottom: 0.25rem;
 
     .chip-btn {
       display: inline-flex;
       align-items: center;
-      gap: 0.35rem;
-      padding: 0.4rem 0.85rem;
-      border-radius: 20px;
-      font-size: 0.82rem;
+      gap: 0.3rem;
+      padding: 0.3rem 0.65rem;
+      border-radius: $radius-sm;
+      font-size: 0.8rem;
       font-weight: 500;
       background: $bg-surface;
       border: 1px solid $border-subtle;
       color: $text-secondary;
       cursor: pointer;
       white-space: nowrap;
-      transition: all $transition-fast;
+      transition: background-color $transition-fast, color $transition-fast, border-color $transition-fast;
 
       &:hover {
         background: $bg-surface-elevated;
@@ -336,34 +318,34 @@ watch(
       }
 
       &.active {
-        background: rgba(0, 242, 254, 0.12);
-        border-color: rgba(0, 242, 254, 0.4);
-        color: $accent-cyan;
-        font-weight: 600;
+        background: #2563eb;
+        border-color: #2563eb;
+        color: #ffffff;
+        font-weight: 500;
       }
 
       .chip-count {
-        opacity: 0.6;
+        opacity: 0.7;
         font-size: 0.75rem;
       }
     }
   }
 
   .refresh-btn {
-    padding: 0.45rem;
-    border-radius: 50%;
+    padding: 0.35rem;
+    border-radius: $radius-sm;
   }
 }
 
 .admin-vis-bar {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
-  padding: 0.5rem 0.85rem;
+  gap: 0.6rem;
+  padding: 0.4rem 0.75rem;
   margin-bottom: 1.25rem;
-  background: rgba(18, 23, 35, 0.6);
-  border: 1px dashed rgba(255, 255, 255, 0.12);
-  border-radius: $radius-md;
+  background: $bg-surface;
+  border: 1px solid $border-medium;
+  border-radius: $radius-sm;
 
   .admin-vis-label {
     font-size: 0.78rem;

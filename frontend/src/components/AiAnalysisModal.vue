@@ -34,11 +34,14 @@ const emit = defineEmits<{
 const { success, error: toastError } = useToast();
 
 const selectedMode = ref<'both' | 'tags' | 'subclips'>('both');
-const selectedModel = ref<string>('gemini-3.8-flash');
+const selectedModel = ref<string>('gemini-3.5-flash-lite');
 const availableModels = ref<string[]>([
+  'gemini-3.5-flash-lite',
   'gemini-3.8-flash',
   'gemini-3.8-pro',
+  'gemini-3.1-flash-lite',
   'gemini-2.5-flash',
+  'gemini-2.5-flash-lite',
   'gemini-2.5-pro'
 ]);
 const isAnalyzing = ref(false);
@@ -418,14 +421,13 @@ onBeforeUnmount(() => {
 .modal-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(5, 8, 17, 0.85);
-  backdrop-filter: blur(8px);
+  background: rgba(0, 0, 0, 0.75);
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 1.5rem;
   z-index: 1000;
-  animation: fadeIn 0.15s ease-out;
+  animation: fadeIn 0.12s ease-out;
 }
 
 .ai-dialog {
@@ -433,9 +435,9 @@ onBeforeUnmount(() => {
   width: 100%;
   max-height: 90vh;
   background: $bg-surface;
-  border: 1px solid rgba(0, 242, 254, 0.3);
+  border: 1px solid $border-medium;
   border-radius: $radius-lg;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.7), 0 0 40px rgba(0, 242, 254, 0.1);
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.7);
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -445,26 +447,26 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 1.25rem 1.5rem;
+  padding: 1.15rem 1.35rem;
   border-bottom: 1px solid $border-subtle;
-  background: linear-gradient(180deg, rgba(0, 242, 254, 0.05) 0%, transparent 100%);
+  background: $bg-surface;
 
   .modal-title-wrap {
     display: flex;
     align-items: center;
-    gap: 0.85rem;
+    gap: 0.75rem;
   }
 
   .ai-sparkle-icon {
-    width: 40px;
-    height: 40px;
-    border-radius: 50%;
-    background: linear-gradient(135deg, rgba(0, 242, 254, 0.2), rgba(121, 40, 202, 0.3));
+    width: 32px;
+    height: 32px;
+    border-radius: $radius-sm;
+    background: rgba(56, 189, 248, 0.12);
+    border: 1px solid rgba(56, 189, 248, 0.25);
     display: flex;
     align-items: center;
     justify-content: center;
-    color: $accent-cyan;
-    box-shadow: 0 0 15px rgba(0, 242, 254, 0.3);
+    color: #38bdf8;
   }
 
   .modal-title {

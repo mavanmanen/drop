@@ -731,26 +731,25 @@ export default {
   .clip-tags-row {
     display: flex;
     flex-wrap: wrap;
-    gap: 0.4rem;
+    gap: 0.35rem;
     margin-top: -0.25rem;
 
     .clip-tag-badge {
       display: inline-flex;
       align-items: center;
-      background: rgba(0, 242, 254, 0.08);
-      border: 1px solid rgba(0, 242, 254, 0.25);
-      color: $accent-cyan;
-      border-radius: 14px;
-      padding: 0.2rem 0.6rem;
-      font-size: 0.78rem;
-      font-weight: 600;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid $border-subtle;
+      color: $text-secondary;
+      border-radius: $radius-xs;
+      padding: 0.15rem 0.5rem;
+      font-size: 0.75rem;
+      font-weight: 500;
       text-decoration: none;
-      transition: all $transition-fast;
+      transition: color $transition-fast, border-color $transition-fast;
 
       &:hover {
-        background: rgba(0, 242, 254, 0.18);
-        border-color: $accent-cyan;
-        transform: translateY(-1px);
+        color: #38bdf8;
+        border-color: rgba(56, 189, 248, 0.4);
       }
     }
   }
@@ -759,15 +758,14 @@ export default {
     display: inline-flex;
     align-items: center;
     gap: 0.35rem;
-    background: linear-gradient(135deg, #00f2fe 0%, #4facfe 100%);
-    color: #050811;
-    font-weight: 700;
-    border: none;
-    box-shadow: 0 0 12px rgba(0, 242, 254, 0.35);
+    background: #2563eb;
+    color: #ffffff;
+    font-weight: 500;
+    border: 1px solid #2563eb;
 
     &:hover {
-      box-shadow: 0 0 18px rgba(0, 242, 254, 0.55);
-      transform: translateY(-1px);
+      background: #1d4ed8;
+      border-color: #1d4ed8;
     }
   }
 

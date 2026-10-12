@@ -79,10 +79,13 @@ public class GeminiAnalysisService : IGeminiAnalysisService
 
     public static readonly string[] SupportedModels =
     [
-        "gemini-2.5-flash",
-        "gemini-2.5-pro",
         "gemini-3.8-flash",
-        "gemini-3.8-pro"
+        "gemini-3.8-pro",
+        "gemini-3.5-flash-lite",
+        "gemini-3.1-flash-lite",
+        "gemini-2.5-flash",
+        "gemini-2.5-flash-lite",
+        "gemini-2.5-pro"
     ];
 
     public bool IsConfigured => !string.IsNullOrWhiteSpace(_apiKey);
@@ -98,7 +101,7 @@ public class GeminiAnalysisService : IGeminiAnalysisService
         _apiKey = configuration["GEMINI_API_KEY"]
                   ?? configuration["DROP_GEMINI_API_KEY"]
                   ?? Environment.GetEnvironmentVariable("GEMINI_API_KEY");
-        _defaultModel = configuration["GEMINI_MODEL"] ?? "gemini-3.8-flash";
+        _defaultModel = configuration["GEMINI_MODEL"] ?? "gemini-3.5-flash-lite";
 
         if (!IsConfigured)
         {

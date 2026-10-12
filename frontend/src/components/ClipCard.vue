@@ -143,22 +143,18 @@ async function copyShareLink(e: Event) {
 .clip-card {
   background: $bg-card;
   border: 1px solid $border-subtle;
-  border-radius: $radius-lg;
+  border-radius: $radius-md;
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  transition: all $transition-smooth;
+  transition: border-color $transition-fast, background-color $transition-fast;
 
   &:hover {
-    transform: translateY(-4px);
-    border-color: $border-cyan;
-    box-shadow: $shadow-card, 0 0 20px $accent-cyan-glow;
+    border-color: rgba(255, 255, 255, 0.2);
+    background: $bg-card-hover;
 
     .thumbnail-overlay {
       opacity: 1;
-    }
-    .thumbnail-img {
-      transform: scale(1.04);
     }
     .copy-quick-btn {
       opacity: 1;
@@ -169,7 +165,7 @@ async function copyShareLink(e: Event) {
 .thumbnail-wrapper {
   position: relative;
   aspect-ratio: 16 / 9;
-  background: #0f121b;
+  background: #0b0d13;
   overflow: hidden;
   display: block;
 
@@ -177,13 +173,12 @@ async function copyShareLink(e: Event) {
     width: 100%;
     height: 100%;
     object-fit: cover;
-    transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1);
   }
 
   .thumbnail-overlay {
     position: absolute;
     inset: 0;
-    background: rgba(11, 13, 19, 0.4);
+    background: rgba(0, 0, 0, 0.35);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -191,39 +186,31 @@ async function copyShareLink(e: Event) {
     transition: opacity $transition-fast;
 
     .play-bubble {
-      width: 48px;
-      height: 48px;
+      width: 40px;
+      height: 40px;
       border-radius: 50%;
-      background: rgba(0, 242, 254, 0.9);
-      color: #050811;
+      background: #ffffff;
+      color: #000000;
       display: flex;
       align-items: center;
       justify-content: center;
-      box-shadow: 0 4px 16px rgba(0, 242, 254, 0.5);
-      transform: scale(0.9);
-      transition: transform $transition-fast;
 
       .play-icon {
-        margin-left: 3px;
+        margin-left: 2px;
       }
     }
   }
 
-  &:hover .play-bubble {
-    transform: scale(1);
-  }
-
   .time-badge {
     position: absolute;
-    bottom: 0.6rem;
-    right: 0.6rem;
-    background: rgba(5, 7, 12, 0.85);
-    backdrop-filter: blur(4px);
-    padding: 0.2rem 0.45rem;
-    border-radius: 4px;
-    font-size: 0.72rem;
-    font-weight: 600;
-    color: #e2e8f0;
+    bottom: 0.5rem;
+    right: 0.5rem;
+    background: rgba(0, 0, 0, 0.85);
+    padding: 0.15rem 0.4rem;
+    border-radius: $radius-xs;
+    font-size: 0.7rem;
+    font-weight: 500;
+    color: #f1f5f9;
     display: flex;
     align-items: center;
     gap: 0.25rem;
@@ -231,18 +218,17 @@ async function copyShareLink(e: Event) {
 
   .visibility-badge {
     position: absolute;
-    top: 0.6rem;
-    left: 0.6rem;
-    padding: 0.2rem 0.5rem;
-    border-radius: 4px;
-    font-size: 0.68rem;
-    font-weight: 700;
+    top: 0.5rem;
+    left: 0.5rem;
+    padding: 0.15rem 0.4rem;
+    border-radius: $radius-xs;
+    font-size: 0.65rem;
+    font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.04em;
     display: flex;
     align-items: center;
-    gap: 0.3rem;
-    backdrop-filter: blur(4px);
+    gap: 0.25rem;
     z-index: 5;
 
     &.vis-unlisted {
@@ -258,24 +244,23 @@ async function copyShareLink(e: Event) {
 
   .copy-quick-btn {
     position: absolute;
-    top: 0.6rem;
-    right: 0.6rem;
-    background: rgba(15, 18, 27, 0.85);
-    backdrop-filter: blur(4px);
-    border: 1px solid $border-medium;
-    color: #e2e8f0;
-    padding: 0.35rem;
-    border-radius: $radius-sm;
+    top: 0.5rem;
+    right: 0.5rem;
+    background: rgba(0, 0, 0, 0.75);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    color: #f1f5f9;
+    padding: 0.3rem;
+    border-radius: $radius-xs;
     cursor: pointer;
-    opacity: 0.7;
-    transition: all $transition-fast;
+    opacity: 0;
+    transition: background-color $transition-fast, color $transition-fast, opacity $transition-fast;
     display: flex;
     align-items: center;
     justify-content: center;
 
     &:hover {
-      background: $accent-cyan;
-      color: #050811;
+      background: #ffffff;
+      color: #000000;
       opacity: 1;
     }
 
@@ -286,10 +271,10 @@ async function copyShareLink(e: Event) {
 }
 
 .card-body {
-  padding: 0.9rem 1rem;
+  padding: 0.75rem 0.85rem;
   display: flex;
   flex-direction: column;
-  gap: 0.45rem;
+  gap: 0.35rem;
   flex: 1;
 
   .clip-title-link {
@@ -297,12 +282,12 @@ async function copyShareLink(e: Event) {
     color: $text-primary;
 
     &:hover .clip-title {
-      color: $accent-cyan;
+      color: #38bdf8;
     }
   }
 
   .clip-title {
-    font-size: 0.95rem;
+    font-size: 0.875rem;
     font-weight: 600;
     line-height: 1.35;
     display: -webkit-box;
@@ -315,8 +300,8 @@ async function copyShareLink(e: Event) {
   .meta-row {
     display: flex;
     align-items: center;
-    gap: 0.4rem;
-    font-size: 0.78rem;
+    gap: 0.35rem;
+    font-size: 0.75rem;
     color: $text-muted;
 
     .meta-item {
@@ -333,25 +318,25 @@ async function copyShareLink(e: Event) {
   .collections-row {
     display: flex;
     flex-wrap: wrap;
-    gap: 0.35rem;
-    margin-top: 0.2rem;
+    gap: 0.3rem;
+    margin-top: 0.15rem;
 
     .col-tag {
       display: inline-flex;
       align-items: center;
       gap: 0.25rem;
-      padding: 0.15rem 0.45rem;
-      border-radius: 4px;
+      padding: 0.1rem 0.35rem;
+      border-radius: $radius-xs;
       font-size: 0.68rem;
       font-weight: 500;
       color: #cbd5e1;
-      background: rgba(139, 92, 246, 0.12);
-      border: 1px solid rgba(139, 92, 246, 0.25);
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid $border-subtle;
       text-decoration: none;
-      transition: all $transition-fast;
+      transition: background-color $transition-fast, color $transition-fast;
 
       &:hover {
-        background: rgba(139, 92, 246, 0.25);
+        background: rgba(255, 255, 255, 0.12);
         color: #fff;
       }
     }
@@ -361,30 +346,30 @@ async function copyShareLink(e: Event) {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: 0.3rem;
-    margin-top: 0.15rem;
+    gap: 0.25rem;
+    margin-top: 0.1rem;
 
     .card-tag-pill {
       font-size: 0.68rem;
-      font-weight: 600;
-      color: $accent-cyan;
-      background: rgba(0, 242, 254, 0.08);
-      border: 1px solid rgba(0, 242, 254, 0.2);
-      padding: 0.12rem 0.4rem;
-      border-radius: 4px;
+      font-weight: 500;
+      color: $text-secondary;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid $border-subtle;
+      padding: 0.08rem 0.35rem;
+      border-radius: $radius-xs;
       text-decoration: none;
-      transition: all $transition-fast;
+      transition: color $transition-fast, border-color $transition-fast;
 
       &:hover {
-        background: rgba(0, 242, 254, 0.18);
-        border-color: $accent-cyan;
+        color: #38bdf8;
+        border-color: rgba(56, 189, 248, 0.4);
       }
     }
 
     .more-tags-indicator {
       font-size: 0.65rem;
       color: $text-muted;
-      font-weight: 600;
+      font-weight: 500;
     }
   }
 }
