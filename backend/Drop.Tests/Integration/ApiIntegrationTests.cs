@@ -476,4 +476,103 @@ public class ApiIntegrationTests : IClassFixture<CustomWebApplicationFactory>
         // Returns NotFound because physical test file is dummy, but route resolution is validated
         Assert.Equal(HttpStatusCode.NotFound, streamMp4Resp.StatusCode);
     }
+
+    [Fact]
+    public async Task Clip_Likes_EndpointsAndSorting_WorkCorrectly()
+    {
+        var anonClient = CreateAnonymousClient();
+        var (adminClient, _) = await CreateAdminClientAsync();
+
+        var clip1Id = "like1-" + Guid.NewGuid().ToString("N")[..6];
+        var clip2Id = "like2-" + Guid.NewGuid().ToString("N")[..6];
+        var privClipId = "like-priv-" + Guid.NewGuid().ToString("N")[..6];
+
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<DropDbContext>();
+            db.Clips.AddRange(
+                new Clip
+                {
+                    Id = clip1Id,
+                    Title = "Clip With 5 Likes",
+                    OriginalFileName = "c1.mp4",
+                    StoredFileName = $"{clip1Id}.mp4",
+                    FileSizeBytes = 100,
+                    Visibility = "public",
+                    LikesCount = 5
+                },
+                new Clip
+                {
+                    Id = clip2Id,
+                    Title = "Clip With 10 Likes",
+                    OriginalFileName = "c2.mp4",
+                    StoredFileName = $"{clip2Id}.mp4",
+                    FileSizeBytes = 100,
+                    Visibility = "public",
+                    LikesCount = 10
+                },
+                new Clip
+                {
+                    Id = privClipId,
+                    Title = "Private Clip",
+                    OriginalFileName = "cpriv.mp4",
+                    StoredFileName = $"{privClipId}.mp4",
+                    FileSizeBytes = 100,
+                    Visibility = "private",
+                    LikesCount = 0
+                }
+            );
+            await db.SaveChangesAsync();
+        }
+
+        // 1. Anonymous client can like a public clip
+        var likeResp = await anonClient.PostAsJsonAsync($"/api/clips/{clip1Id}/like", new { liked = true });
+        Assert.Equal(HttpStatusCode.OK, likeResp.StatusCode);
+        var likeJson = await likeResp.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal(clip1Id, likeJson.GetProperty("id").GetString());
+        Assert.Equal(6, likeJson.GetProperty("likesCount").GetInt64());
+        Assert.True(likeJson.GetProperty("liked").GetBoolean());
+
+        // 2. Anonymous client can unlike using POST with liked=false
+        var unlikePostResp = await anonClient.PostAsJsonAsync($"/api/clips/{clip1Id}/like", new { liked = false });
+        Assert.Equal(HttpStatusCode.OK, unlikePostResp.StatusCode);
+        var unlikePostJson = await unlikePostResp.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal(5, unlikePostJson.GetProperty("likesCount").GetInt64());
+        Assert.False(unlikePostJson.GetProperty("liked").GetBoolean());
+
+        // 3. Anonymous client can unlike using DELETE /api/clips/{id}/like
+        var unlikeDeleteResp = await anonClient.DeleteAsync($"/api/clips/{clip1Id}/like");
+        Assert.Equal(HttpStatusCode.OK, unlikeDeleteResp.StatusCode);
+        var unlikeDeleteJson = await unlikeDeleteResp.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal(4, unlikeDeleteJson.GetProperty("likesCount").GetInt64());
+        Assert.False(unlikeDeleteJson.GetProperty("liked").GetBoolean());
+
+        // 4. Anonymous client liking private clip gets 404
+        var anonPrivLikeResp = await anonClient.PostAsJsonAsync($"/api/clips/{privClipId}/like", new { liked = true });
+        Assert.Equal(HttpStatusCode.NotFound, anonPrivLikeResp.StatusCode);
+
+        // 5. Admin can like private clip
+        var adminPrivLikeResp = await adminClient.PostAsJsonAsync($"/api/clips/{privClipId}/like", new { liked = true });
+        Assert.Equal(HttpStatusCode.OK, adminPrivLikeResp.StatusCode);
+        var adminPrivLikeJson = await adminPrivLikeResp.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal(1, adminPrivLikeJson.GetProperty("likesCount").GetInt64());
+        Assert.True(adminPrivLikeJson.GetProperty("liked").GetBoolean());
+
+        // 6. Liking non-existent clip returns 404
+        var notFoundResp = await anonClient.PostAsJsonAsync("/api/clips/non-existent-id/like", new { liked = true });
+        Assert.Equal(HttpStatusCode.NotFound, notFoundResp.StatusCode);
+
+        // 7. GET /api/clips?sortBy=likes returns clips sorted by LikesCount descending
+        var sortedResp = await anonClient.GetFromJsonAsync<JsonElement>("/api/clips?sortBy=likes");
+        var items = sortedResp.GetProperty("items").EnumerateArray().ToList();
+
+        var clip2Index = items.FindIndex(c => c.GetProperty("id").GetString() == clip2Id);
+        var clip1Index = items.FindIndex(c => c.GetProperty("id").GetString() == clip1Id);
+
+        Assert.True(clip2Index >= 0, "Clip 2 should be in the results");
+        Assert.True(clip1Index >= 0, "Clip 1 should be in the results");
+        Assert.True(clip2Index < clip1Index, "Clip 2 (10 likes) should appear before Clip 1 (4 likes)");
+        Assert.DoesNotContain(items, c => c.GetProperty("id").GetString() == privClipId);
+    }
 }
+

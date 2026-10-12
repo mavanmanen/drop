@@ -27,6 +27,8 @@ public record AiStatusResponse(bool IsConfigured, IReadOnlyList<string> Availabl
 [JsonSerializable(typeof(ClipEndpoints.ClipUpdateRequest))]
 [JsonSerializable(typeof(ClipEndpoints.ClipTrimRequest))]
 [JsonSerializable(typeof(ClipEndpoints.ClipAnalyzeAiRequest))]
+[JsonSerializable(typeof(ClipEndpoints.ClipLikeRequest))]
+[JsonSerializable(typeof(ClipEndpoints.ClipLikeResponse))]
 [JsonSerializable(typeof(ClipEndpoints.ClipListResponse))]
 [JsonSerializable(typeof(List<ClipEndpoints.ClipDto>))]
 [JsonSerializable(typeof(List<string>))]

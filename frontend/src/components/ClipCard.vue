@@ -2,13 +2,15 @@
 import { ref } from 'vue';
 import type { Clip } from '../api/client';
 import { useToast } from '../stores/toast';
-import { Play, Copy, Check, Eye, Clock, Folder, Lock, Link2 } from '@lucide/vue';
+import { Play, Copy, Check, Eye, Clock, Folder, Lock, Link2, Heart } from '@lucide/vue';
+import { useLikes } from '../composables/useLikes';
 
 const props = defineProps<{
   clip: Clip;
 }>();
 
 const { success } = useToast();
+const { isLiked, toggleLike } = useLikes();
 const copied = ref(false);
 
 function formatDuration(sec: number | null): string {
@@ -102,6 +104,16 @@ async function copyShareLink(e: Event) {
           <Eye :size="13" />
           <span>{{ clip.viewsCount }} views</span>
         </span>
+        <span class="meta-dot">•</span>
+        <button
+          class="card-like-btn"
+          :class="{ 'is-liked': isLiked(clip.id) }"
+          :title="isLiked(clip.id) ? 'Unlike this clip' : 'Like this clip'"
+          @click.prevent.stop="toggleLike(clip)"
+        >
+          <Heart :size="12" class="card-like-icon" :class="{ 'fill-current': isLiked(clip.id) }" />
+          <span>{{ clip.likesCount }}</span>
+        </button>
         <span class="meta-dot">•</span>
         <span class="meta-item">{{ formatDate(clip.createdAtUtc) }}</span>
       </div>
@@ -308,6 +320,33 @@ async function copyShareLink(e: Event) {
       display: flex;
       align-items: center;
       gap: 0.25rem;
+    }
+
+    .card-like-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.25rem;
+      background: none;
+      border: none;
+      padding: 0.1rem 0.25rem;
+      border-radius: $radius-xs;
+      font-size: 0.75rem;
+      color: $text-muted;
+      cursor: pointer;
+      transition: color $transition-fast, background-color $transition-fast;
+
+      &:hover {
+        color: #f43f5e;
+        background: rgba(244, 63, 94, 0.1);
+      }
+
+      &.is-liked {
+        color: #f43f5e;
+
+        .card-like-icon {
+          fill: #f43f5e;
+        }
+      }
     }
 
     .meta-dot {

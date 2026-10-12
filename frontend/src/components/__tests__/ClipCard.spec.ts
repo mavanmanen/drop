@@ -23,6 +23,7 @@ describe('ClipCard.vue', () => {
     thumbnailUrl: '/api/clips/testclip1/thumbnail',
     createdAtUtc: new Date().toISOString(),
     viewsCount: 42,
+    likesCount: 17,
     visibility: 'public',
     collections: [],
   };
@@ -97,5 +98,18 @@ describe('ClipCard.vue', () => {
 
     expect(wrapper.text()).toContain('Highlights');
     expect(wrapper.text()).toContain('Season 25');
+  });
+
+  it('renders like count button on card', () => {
+    const wrapper = mount(ClipCard, {
+      props: { clip: baseClip },
+      global: {
+        stubs: routerLinkStub,
+      },
+    });
+
+    const likeBtn = wrapper.find('.card-like-btn');
+    expect(likeBtn.exists()).toBe(true);
+    expect(likeBtn.text()).toContain('17');
   });
 });

@@ -21,6 +21,7 @@ public static class ClipEndpoints
         string? ThumbnailUrl,
         DateTime CreatedAtUtc,
         long ViewsCount,
+        long LikesCount,
         string Visibility,
         List<string> Tags,
         AiClipAnalysisResult? LatestAiAnalysis,
@@ -35,7 +36,8 @@ public static class ClipEndpoints
         string? ThumbnailUrl,
         double? DurationSeconds,
         string Visibility,
-        DateTime CreatedAtUtc
+        DateTime CreatedAtUtc,
+        long LikesCount = 0
     );
 
     public record ClipCollectionSummaryDto(string Id, string Name);
@@ -50,6 +52,8 @@ public static class ClipEndpoints
         List<string>? Tags
     );
     public record ClipAnalyzeAiRequest(string Mode, string? Model = null, string? Context = null); // "tags", "subclips", "both"
+    public record ClipLikeRequest(bool? Liked = null);
+    public record ClipLikeResponse(string Id, long LikesCount, bool Liked);
     public record ClipListResponse(List<ClipDto> Items, int TotalCount, int Page, int PageSize);
 
     public static string NormalizeVisibility(string? v)
@@ -108,6 +112,7 @@ public static class ClipEndpoints
             [FromQuery] string? collectionId,
             [FromQuery] string? visibility,
             [FromQuery] string? tag,
+            [FromQuery] string? sortBy,
             [FromQuery] int page = 1,
             [FromQuery] int pageSize = 24) =>
         {
@@ -153,8 +158,15 @@ public static class ClipEndpoints
 
             var totalCount = await query.CountAsync();
 
+            query = (sortBy?.Trim().ToLowerInvariant()) switch
+            {
+                "likes" => query.OrderByDescending(c => c.LikesCount).ThenByDescending(c => c.CreatedAtUtc),
+                "views" => query.OrderByDescending(c => c.ViewsCount).ThenByDescending(c => c.CreatedAtUtc),
+                "oldest" => query.OrderBy(c => c.CreatedAtUtc),
+                _ => query.OrderByDescending(c => c.CreatedAtUtc)
+            };
+
             var items = await query
-                .OrderByDescending(c => c.CreatedAtUtc)
                 .Skip((page - 1) * pageSize)
                 .Take(pageSize)
                 .Select(c => ToDto(c))
@@ -187,6 +199,57 @@ public static class ClipEndpoints
             await db.SaveChangesAsync();
 
             return Results.Ok(ToDto(clip, isAdmin));
+        });
+
+        // Like / Unlike clip (Public and unlisted clips can be liked by any viewer; Private requires admin)
+        group.MapPost("/{id}/like", async (
+            string id,
+            DropDbContext db,
+            IAuthService authService,
+            HttpContext httpContext,
+            ClipLikeRequest? req) =>
+        {
+            var clip = await db.Clips.FindAsync(id);
+            if (clip == null) return Results.NotFound(new { error = "Clip not found" });
+
+            if (clip.Visibility == "private" && !authService.IsAdmin(httpContext))
+            {
+                return Results.NotFound(new { error = "Clip not found" });
+            }
+
+            var isLike = req?.Liked ?? true;
+            if (isLike)
+            {
+                clip.LikesCount++;
+            }
+            else
+            {
+                clip.LikesCount = Math.Max(0, clip.LikesCount - 1);
+            }
+
+            await db.SaveChangesAsync();
+
+            return Results.Ok(new ClipLikeResponse(clip.Id, clip.LikesCount, isLike));
+        });
+
+        group.MapDelete("/{id}/like", async (
+            string id,
+            DropDbContext db,
+            IAuthService authService,
+            HttpContext httpContext) =>
+        {
+            var clip = await db.Clips.FindAsync(id);
+            if (clip == null) return Results.NotFound(new { error = "Clip not found" });
+
+            if (clip.Visibility == "private" && !authService.IsAdmin(httpContext))
+            {
+                return Results.NotFound(new { error = "Clip not found" });
+            }
+
+            clip.LikesCount = Math.Max(0, clip.LikesCount - 1);
+            await db.SaveChangesAsync();
+
+            return Results.Ok(new ClipLikeResponse(clip.Id, clip.LikesCount, false));
         });
 
         // Stream video: Private clips require admin
@@ -567,6 +630,7 @@ public static class ClipEndpoints
         ThumbnailUrl: $"/api/clips/{clip.Id}/thumbnail",
         CreatedAtUtc: clip.CreatedAtUtc,
         ViewsCount: clip.ViewsCount,
+        LikesCount: clip.LikesCount,
         Visibility: clip.Visibility ?? "public",
         Tags: ParseTags(clip.Tags),
         LatestAiAnalysis: ParseAiAnalysis(clip.AiAnalysisJson),
@@ -591,6 +655,7 @@ public static class ClipEndpoints
         ThumbnailUrl: $"/api/clips/{clip.Id}/thumbnail",
         DurationSeconds: clip.DurationSeconds,
         Visibility: clip.Visibility ?? "public",
-        CreatedAtUtc: clip.CreatedAtUtc
+        CreatedAtUtc: clip.CreatedAtUtc,
+        LikesCount: clip.LikesCount
     );
 }

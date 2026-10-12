@@ -38,6 +38,7 @@ describe('HomeView.vue', () => {
           thumbnailUrl: '/api/clips/c1/thumbnail',
           createdAtUtc: new Date().toISOString(),
           viewsCount: 1,
+          likesCount: 10,
           visibility: 'public',
           collections: [],
         },

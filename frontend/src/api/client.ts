@@ -12,6 +12,7 @@ export interface ClipSummary {
   durationSeconds: number | null;
   visibility: Visibility;
   createdAtUtc: string;
+  likesCount?: number;
 }
 
 export interface AiSubClipSuggestion {
@@ -40,6 +41,7 @@ export interface Clip {
   thumbnailUrl: string | null;
   createdAtUtc: string;
   viewsCount: number;
+  likesCount: number;
   visibility: Visibility;
   tags?: string[];
   latestAiAnalysis?: AiClipAnalysisResult | null;
@@ -163,6 +165,7 @@ class ApiClient {
     collectionId?: string;
     visibility?: string;
     tag?: string;
+    sortBy?: string;
     page?: number;
     pageSize?: number;
   }): Promise<ClipListResponse> {
@@ -171,6 +174,7 @@ class ApiClient {
     if (params?.collectionId) query.set('collectionId', params.collectionId);
     if (params?.visibility) query.set('visibility', params.visibility);
     if (params?.tag) query.set('tag', params.tag);
+    if (params?.sortBy) query.set('sortBy', params.sortBy);
     if (params?.page) query.set('page', params.page.toString());
     if (params?.pageSize) query.set('pageSize', params.pageSize.toString());
 
@@ -192,6 +196,20 @@ class ApiClient {
 
   async deleteClip(id: string): Promise<void> {
     await this.request(`/clips/${id}`, { method: 'DELETE' });
+  }
+
+  async likeClip(id: string, liked: boolean = true): Promise<{ id: string; likesCount: number; liked: boolean }> {
+    return this.request<{ id: string; likesCount: number; liked: boolean }>(`/clips/${id}/like`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ liked }),
+    });
+  }
+
+  async unlikeClip(id: string): Promise<{ id: string; likesCount: number; liked: boolean }> {
+    return this.request<{ id: string; likesCount: number; liked: boolean }>(`/clips/${id}/like`, {
+      method: 'DELETE',
+    });
   }
 
   async trimClip(id: string, data: {

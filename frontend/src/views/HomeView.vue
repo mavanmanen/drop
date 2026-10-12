@@ -19,6 +19,7 @@ const selectedCollectionId = ref<string>('');
 const selectedVisibility = ref<string>('');
 const currentTag = ref((route.query.tag as string) || '');
 const currentSearch = ref((route.query.q as string) || '');
+const selectedSort = ref<string>('newest');
 
 async function loadClips() {
   isLoading.value = true;
@@ -28,6 +29,7 @@ async function loadClips() {
       collectionId: selectedCollectionId.value || undefined,
       visibility: selectedVisibility.value || undefined,
       tag: currentTag.value || undefined,
+      sortBy: selectedSort.value || undefined,
       page: currentPage.value,
       pageSize,
     });
@@ -56,6 +58,11 @@ function selectCollection(colId: string) {
 
 function selectVisibility(vis: string) {
   selectedVisibility.value = vis;
+  currentPage.value = 1;
+  loadClips();
+}
+
+function onSortChange() {
   currentPage.value = 1;
   loadClips();
 }
@@ -131,9 +138,19 @@ watch(
         </button>
       </div>
 
-      <button class="btn btn-ghost refresh-btn" title="Refresh clips list" @click="loadClips">
-        <RefreshCw :size="15" :class="{ spinning: isLoading }" />
-      </button>
+      <div class="filter-actions">
+        <div class="sort-selector">
+          <select v-model="selectedSort" class="sort-select" title="Sort clips" @change="onSortChange">
+            <option value="newest">Newest</option>
+            <option value="likes">Most Liked</option>
+            <option value="views">Most Viewed</option>
+            <option value="oldest">Oldest</option>
+          </select>
+        </div>
+        <button class="btn btn-ghost refresh-btn" title="Refresh clips list" @click="loadClips">
+          <RefreshCw :size="15" :class="{ spinning: isLoading }" />
+        </button>
+      </div>
     </div>
 
     <!-- Admin Visibility Filters -->
@@ -331,9 +348,35 @@ watch(
     }
   }
 
-  .refresh-btn {
-    padding: 0.35rem;
-    border-radius: $radius-sm;
+  .filter-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    flex-shrink: 0;
+
+    .sort-select {
+      height: 30px;
+      padding: 0 0.5rem;
+      font-size: 0.78rem;
+      font-weight: 500;
+      background: $bg-surface;
+      border: 1px solid $border-subtle;
+      color: $text-secondary;
+      border-radius: $radius-sm;
+      cursor: pointer;
+      outline: none;
+      transition: border-color $transition-fast, color $transition-fast;
+
+      &:hover, &:focus {
+        border-color: $border-medium;
+        color: $text-primary;
+      }
+    }
+
+    .refresh-btn {
+      padding: 0.35rem;
+      border-radius: $radius-sm;
+    }
   }
 }
 

@@ -26,16 +26,19 @@ import {
   Film,
   ArrowUpRight,
   Sparkles,
-  Tag
+  Tag,
+  Heart
 } from '@lucide/vue';
 import TrimModal from '../components/TrimModal.vue';
 import AiAnalysisModal from '../components/AiAnalysisModal.vue';
 import type { AiSubClipSuggestion } from '../api/client';
+import { useLikes } from '../composables/useLikes';
 
 const route = useRoute();
 const router = useRouter();
 const { state: auth } = useAuth();
 const { success, error: toastError } = useToast();
+const { isLiked, toggleLike } = useLikes();
 
 const playerRef = ref<InstanceType<typeof VideoPlayer> | null>(null);
 const clip = ref<Clip | null>(null);
@@ -363,6 +366,16 @@ watch(
 
           <!-- Metrics bar -->
           <div class="metrics-bar">
+            <button
+              class="like-btn"
+              :class="{ 'is-liked': isLiked(clip.id) }"
+              :title="isLiked(clip.id) ? 'Unlike this clip' : 'Like this clip'"
+              @click="toggleLike(clip)"
+            >
+              <Heart :size="15" class="like-icon" :class="{ 'fill-current': isLiked(clip.id) }" />
+              <span><strong>{{ clip.likesCount }}</strong> {{ clip.likesCount === 1 ? 'like' : 'likes' }}</span>
+            </button>
+            <div class="metric-dot">•</div>
             <div class="metric-item">
               <Eye :size="15" />
               <span><strong>{{ clip.viewsCount }}</strong> views</span>
@@ -777,6 +790,49 @@ export default {
     color: $text-muted;
     border-top: 1px solid $border-subtle;
     padding-top: 0.85rem;
+    flex-wrap: wrap;
+
+    .like-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid $border-subtle;
+      color: $text-secondary;
+      padding: 0.25rem 0.65rem;
+      border-radius: $radius-sm;
+      font-size: 0.8rem;
+      cursor: pointer;
+      transition: all $transition-fast;
+
+      strong {
+        color: $text-primary;
+      }
+
+      &:hover {
+        background: rgba(244, 63, 94, 0.1);
+        border-color: rgba(244, 63, 94, 0.3);
+        color: #f43f5e;
+
+        strong {
+          color: #f43f5e;
+        }
+      }
+
+      &.is-liked {
+        background: rgba(244, 63, 94, 0.15);
+        border-color: rgba(244, 63, 94, 0.5);
+        color: #f43f5e;
+
+        strong {
+          color: #f43f5e;
+        }
+
+        .like-icon {
+          fill: #f43f5e;
+        }
+      }
+    }
 
     .metric-item {
       display: flex;

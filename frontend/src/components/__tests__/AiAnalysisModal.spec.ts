@@ -35,6 +35,7 @@ describe('AiAnalysisModal.vue', () => {
     thumbnailUrl: '/api/clips/testclip1/thumbnail',
     createdAtUtc: '2026-10-11T12:00:00Z',
     viewsCount: 15,
+    likesCount: 3,
     visibility: 'public',
     tags: ['sniper', 'haven'],
     collections: [],

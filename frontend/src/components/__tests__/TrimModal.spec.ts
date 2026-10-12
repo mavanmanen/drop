@@ -17,6 +17,7 @@ describe('TrimModal.vue', () => {
     thumbnailUrl: '/api/clips/longclip123/thumbnail',
     createdAtUtc: new Date().toISOString(),
     viewsCount: 15,
+    likesCount: 0,
     visibility: 'public',
     collections: [],
   };

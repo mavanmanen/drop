@@ -154,6 +154,12 @@ public static class DatabaseConfigurator
                 await db.Database.ExecuteSqlRawAsync("ALTER TABLE Clips ADD COLUMN AiAnalysisJson TEXT NULL;");
             }
             catch { /* Column already exists */ }
+
+            try
+            {
+                await db.Database.ExecuteSqlRawAsync("ALTER TABLE Clips ADD COLUMN LikesCount INTEGER NOT NULL DEFAULT 0;");
+            }
+            catch { /* Column already exists */ }
         }
         else if (db.Database.IsNpgsql())
         {
@@ -184,6 +190,12 @@ public static class DatabaseConfigurator
             try
             {
                 await db.Database.ExecuteSqlRawAsync("ALTER TABLE \"Clips\" ADD COLUMN IF NOT EXISTS \"AiAnalysisJson\" text NULL;");
+            }
+            catch { /* Column already exists */ }
+
+            try
+            {
+                await db.Database.ExecuteSqlRawAsync("ALTER TABLE \"Clips\" ADD COLUMN IF NOT EXISTS \"LikesCount\" bigint NOT NULL DEFAULT 0;");
             }
             catch { /* Column already exists */ }
         }
